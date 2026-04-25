@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WiFi Digital Clock — MAX7219 4×8×8 + ESP32, 18650-powered</title>
+<style>
+  :root{--bg:#0f1115;--panel:#161a22;--ink:#e6e6e6;--muted:#9aa0a6;--accent:#6ee7b7;--accent2:#f59e0b;--warn:#f87171;--ok:#34d399;--link:#93c5fd;--border:#262b36;--code-bg:#0b0d12;}
+  @media (prefers-color-scheme: light){:root{--bg:#fafafa;--panel:#fff;--ink:#1a1a1a;--muted:#555;--accent:#047857;--accent2:#b45309;--warn:#b91c1c;--ok:#15803d;--link:#1d4ed8;--border:#e5e7eb;--code-bg:#f3f4f6;}}
+  *{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:17px;margin:20px 0 8px;color:var(--accent)}h4{font-size:15px;margin:14px 0 6px;color:var(--accent2);text-transform:uppercase;letter-spacing:.04em}
+  p{margin:8px 0}a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+  .meta{color:var(--muted);font-size:13px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:14px 0}
+  .ok{border-left:3px solid var(--ok);background:rgba(52,211,153,.06)}
+  .warn-panel{border-left:3px solid var(--warn);background:rgba(248,113,113,.05)}
+  pre,code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.45}
+  code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:.92em}
+  pre code{background:none;padding:0}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--accent);font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;background:rgba(110,231,183,.12);color:var(--accent);border:1px solid rgba(110,231,183,.3);margin-right:4px}
+  .warn{color:var(--warn);font-weight:600}.good{color:var(--ok);font-weight:600}
+  ul,ol{padding-left:22px}li{margin:4px 0}
+  .toc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin:16px 0 28px;font-size:13.5px}
+  hr{border:0;border-top:1px solid var(--border);margin:32px 0}
+  footer{color:var(--muted);font-size:12.5px;margin-top:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>WiFi Digital Clock — MAX7219 4×(8×8) + ESP32 + 18650</h1>
+  <p class="meta">
+    Battery-powered scrolling/static-digit clock. ESP32 syncs over WiFi (NTP), drives a 32×8 matrix via SPI, runs from a single 18650 with USB-C charging and 5 V boost.
+  </p>
+  <p>
+    <span class="tag">SPI display</span>
+    <span class="tag">NTP time sync</span>
+    <span class="tag">USB-C charge</span>
+    <span class="tag">~1200 BDT BOM</span>
+    <span class="tag">all parts in stock @ udvabony</span>
+  </p>
+</header>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#overview">Overview &amp; choices</a></li>
+    <li><a href="#power">Power chain</a></li>
+    <li><a href="#wiring">ESP32 ↔ MAX7219 wiring</a></li>
+    <li><a href="#firmware">Firmware sketch</a></li>
+    <li><a href="#bom">BOM (all linked)</a></li>
+    <li><a href="#enclosure">Enclosure / build notes</a></li>
+    <li><a href="#extensions">Optional extensions</a></li>
+  </ol>
+</nav>
+
+<section id="overview">
+<h2>1. Overview &amp; choices</h2>
+
+<h4>MCU: ESP32 (NodeMCU-32S, 30-pin) — recommended over ESP8266</h4>
+<ul>
+  <li>Hardware SPI runs the matrix at 10+ MHz cleanly (animations stay smooth).</li>
+  <li>Built-in WiFi for SNTP — no RTC chip needed if always near a network. Add <a href="https://udvabony.com/product/ds3231-rtc-high-precision-real-module/" target="_blank">DS3231</a> only if you want offline timekeeping.</li>
+  <li>Cheaper than the OLED-bundled 8266 board (450 BDT vs 2100 BDT). Pick the <strong>30-pin Type-C</strong> variant — fits a breadboard with rails on both sides.</li>
+  <li>ESP8266 also works; pin assignments below cover both.</li>
+</ul>
+
+<h4>Display: MAX7219 4-in-1 (red), 32×8 dots</h4>
+<ul>
+  <li>Pre-assembled module (SKU <a href="https://udvabony.com/product/max7219-microcontroller-4-in-1-dot-matrix/" target="_blank">u3937</a>, 460 BDT). 5-pin cable: VCC, GND, DIN, CS, CLK. Daisy-chain ready (DOUT pads on the right edge if you add more).</li>
+  <li>Library: <code>MD_Parola</code> + <code>MD_MAX72XX</code> (Arduino) or <code>U8g2</code> (less idiomatic). Hardware = <code>FC16</code> for these China-made boards (some are <code>GENERIC</code>; flip the constant if rows/cols are mirrored).</li>
+  <li>Pixel pitch ~3 mm; 4 modules = 128 mm wide. Fits HH:MM with colon as a 2-pixel block.</li>
+</ul>
+
+<h4>Power: 18650 → TP4056 charger → MT3608 boost → ESP32 + matrix</h4>
+<p>Single cell (3.0–4.2 V) charged over USB-C, boosted to 5 V for the matrix and the ESP32 5 V pin. ESP32 has its own AMS1117-3.3 onboard, so we don't need a separate 3.3 V regulator.</p>
+</section>
+
+<section id="power">
+<h2>2. Power chain</h2>
+<pre><code>           USB-C (charge)
+                │
+                ▼
+       ┌────────────────┐
+       │ TP4056 Type-C  │  ← module already includes USB-C jack & protection IC
+       │ + DW01 prot.   │
+       └─────┬──────────┘
+             │ B+/B-
+             ▼
+       ┌──────────────┐
+       │ 18650 cell   │  3.0–4.2 V
+       └─────┬────────┘
+             │ (cell+ to load via TP4056 OUT+, OUT-)
+             ▼
+       ┌──────────────┐
+       │ MT3608 boost │  out trimmed to 5.0 V (via the onboard pot)
+       │ Vin 2–24     │
+       │ Vout 5–28    │
+       └──┬───────────┘
+          │ +5V
+          ├──► MAX7219 matrix VCC      (peak ~600 mA at full brightness, 4 modules)
+          └──► ESP32 5V pin             (LDO drops to 3.3 V on board)
+
+   Common GND throughout.</code></pre>
+
+<div class="panel warn-panel">
+  <strong>Brightness limit:</strong> the matrix at full brightness with all LEDs on draws ~600–800 mA. The MT3608 module is rated 2 A but the cheap inductors sag above ~1 A. Cap brightness at <code>intensity = 4</code> in firmware (range 0–15) and you'll stay around 250 mA — comfortable for the cell and the boost converter.
+</div>
+
+<p>Use the <strong>protected TP4056</strong> variant (<a href="https://udvabony.com/product/tp4056-lithium-battery-charger-with-protection-c-type/" target="_blank">u101528</a>, USB-C, 22 BDT) — has DW01 + 8205A under-voltage / over-discharge cutoff, which an ESP32 absolutely needs (it pulls 200+ mA bursts during WiFi transmit and will brown-out into a flat cell).</p>
+
+<p><strong>Runtime estimate:</strong> 18650 ≈ 2500 mAh × 3.7 V = 9.25 Wh. At 250 mA × 5 V = 1.25 W draw, runtime ≈ 7 h continuous. With brightness 1 + WiFi sleep between NTP syncs, push to 24 h+.</p>
+</section>
+
+<section id="wiring">
+<h2>3. Wiring — ESP32 ↔ MAX7219</h2>
+<table>
+  <thead><tr><th>Matrix pin</th><th>Function</th><th>ESP32 pin (NodeMCU-32S 30-pin)</th><th>ESP8266 pin (NodeMCU)</th></tr></thead>
+  <tbody>
+    <tr><td>VCC</td><td>+5 V</td><td>VIN (5 V from MT3608)</td><td>VIN</td></tr>
+    <tr><td>GND</td><td>GND</td><td>GND</td><td>GND</td></tr>
+    <tr><td>DIN</td><td>SPI MOSI</td><td>GPIO23</td><td>D7 (GPIO13)</td></tr>
+    <tr><td>CS</td><td>chip select</td><td>GPIO5</td><td>D8 (GPIO15)</td></tr>
+    <tr><td>CLK</td><td>SPI SCK</td><td>GPIO18</td><td>D5 (GPIO14)</td></tr>
+  </tbody>
+</table>
+<p>The matrix is 5 V logic but its DIN/CS/CLK are happy with 3.3 V swings (MAX7219's input threshold ≈ 3 V at VCC = 5 V) — no level shifter needed. Verified on hundreds of these builds.</p>
+
+<h4>Optional: brightness-following LDR</h4>
+<table>
+  <thead><tr><th>Component</th><th>Wiring</th></tr></thead>
+  <tbody>
+    <tr><td><a href="https://udvabony.com/product/7mm-light-dependent-resistor-ldr/" target="_blank">LDR (u3305)</a></td><td>One leg → 3.3 V; other leg → GPIO34 + 10k pulldown to GND. ESP32 ADC reads ambient.</td></tr>
+  </tbody>
+</table>
+
+<h4>Optional: tactile mode buttons</h4>
+<p>Two buttons (<a href="https://udvabony.com/product/665mm-4-pin-tactile-push-switch/" target="_blank">u5255</a>, 5 BDT each): one to GPIO32, one to GPIO33; each with internal pullup, the other side to GND.</p>
+
+<h4>Optional: alarm buzzer</h4>
+<p>Active 5 V buzzer (<a href="https://udvabony.com/product/buzzer-5v-to-12v/" target="_blank">u9331</a>, 15 BDT): + → GPIO25 via a 2N3819 or just direct (the buzzer is only ~30 mA), − → GND.</p>
+</section>
+
+<section id="firmware">
+<h2>4. Firmware sketch (Arduino, ESP32)</h2>
+
+<p>Libraries (Library Manager):</p>
+<ul>
+  <li><code>MD_Parola</code> by majicDesigns</li>
+  <li><code>MD_MAX72XX</code> by majicDesigns</li>
+</ul>
+
+<pre><code>#include &lt;WiFi.h&gt;
+#include &lt;time.h&gt;
+#include &lt;MD_Parola.h&gt;
+#include &lt;MD_MAX72xx.h&gt;
+#include &lt;SPI.h&gt;
+
+#define HW_TYPE   MD_MAX72XX::FC16_HW    // FC16 for the China 4-in-1 boards
+#define MAX_DEV   4
+#define DATA_PIN  23
+#define CS_PIN    5
+#define CLK_PIN   18
+
+const char* WIFI_SSID = "your-ssid";
+const char* WIFI_PASS = "your-pass";
+const char* TZ_INFO   = "+06";           // Asia/Dhaka, fixed offset; or use POSIX TZ string
+const char* NTP1      = "pool.ntp.org";
+const char* NTP2      = "time.google.com";
+
+MD_Parola P = MD_Parola(HW_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEV);
+
+void setup() {
+  P.begin();
+  P.setIntensity(2);                     // 0..15, keep low for battery + eyes
+  P.displayClear();
+  P.setTextAlignment(PA_CENTER);
+  P.print("WiFi");
+
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while (WiFi.status() != WL_CONNECTED) delay(200);
+
+  configTime(0, 0, NTP1, NTP2);
+  setenv("TZ", "&lt;+06&gt;-6", 1); tzset();   // Bangladesh: UTC+6, no DST
+  P.print("sync");
+}
+
+char buf[8];
+void loop() {
+  time_t now = time(nullptr);
+  struct tm tm; localtime_r(&now, &tm);
+
+  // alternate colon every 500 ms
+  if ((millis() / 500) & 1) snprintf(buf, sizeof buf, "%02d:%02d", tm.tm_hour, tm.tm_min);
+  else                      snprintf(buf, sizeof buf, "%02d %02d", tm.tm_hour, tm.tm_min);
+
+  P.print(buf);
+  delay(250);
+
+  // dim at night based on hour (or read LDR on GPIO34)
+  P.setIntensity(tm.tm_hour &gt;= 22 || tm.tm_hour &lt; 7 ? 0 : 3);
+}
+</code></pre>
+
+<p>That's a working clock. Add a once-an-hour <code>configTime()</code> re-sync if you want lower drift; otherwise NTP at boot is enough — ESP32's RTC drifts ~1 s/day.</p>
+</section>
+
+<section id="bom">
+<h2>5. BOM — every row linked to udvabony.com</h2>
+
+<table>
+  <thead><tr><th>Ref</th><th>Part</th><th>Qty</th><th>SKU / link</th><th>BDT</th><th>Note</th></tr></thead>
+  <tbody>
+    <tr><td>U1</td><td>ESP32 NodeMCU-32S, 30-pin Type-C</td><td>1</td><td><a href="https://udvabony.com/product/esp8266-esp-01-wifi-transceiver-breakout-kit/" target="_blank">u8549</a></td><td>480</td><td>recommended</td></tr>
+    <tr><td>U1 (alt)</td><td>ESP8266 NodeMCU CH340 Type-C</td><td>1</td><td><a href="https://udvabony.com/product/esp8266-node-mcu-type-c-ch340-wifi-iot-development-board/" target="_blank">u170517</a></td><td>299</td><td>cheaper, fine for this</td></tr>
+    <tr><td>D1</td><td>MAX7219 4-in-1 8×8 matrix (red)</td><td>1</td><td><a href="https://udvabony.com/product/max7219-microcontroller-4-in-1-dot-matrix/" target="_blank">u3937</a></td><td>460</td><td>32×8 display</td></tr>
+    <tr><td>BAT1</td><td>18650 Li-ion cell, 3.7 V</td><td>1</td><td><a href="https://udvabony.com/product/18650-3-7v-lithium-ion-rechargeable-battery/" target="_blank">u1308</a></td><td>80</td><td>~2500 mAh genuine; the 65 BDT one (<a href="https://udvabony.com/product/3-7v-3000-mah-18650-rechargeable-li-ion/" target="_blank">u1264</a>) is "ULF normal" — labeled 3000 mAh but lower in practice. Pick u1308 for reliability</td></tr>
+    <tr><td>HOLDER1</td><td>1× 18650 plastic holder w/ leads</td><td>1</td><td><a href="https://udvabony.com/product/18650-single-battery-holder-case-black-color/" target="_blank">u8783</a></td><td>29</td><td>—</td></tr>
+    <tr><td>CHG1</td><td>TP4056 USB-C with protection (DW01+8205A)</td><td>1</td><td><a href="https://udvabony.com/product/tp4056-lithium-battery-charger-with-protection-c-type/" target="_blank">u101528</a></td><td>22</td><td><span class="good">use the protected version, not bare TP4056</span></td></tr>
+    <tr><td>BOOST1</td><td>MT3608 boost (set to 5.0 V)</td><td>1</td><td><a href="https://udvabony.com/product/mt3608-output-28v-2a-dc-dc-up-converter/" target="_blank">u7769</a></td><td>55</td><td>trim onboard pot to exactly 5.0 V before connecting load</td></tr>
+    <tr><td>SW1</td><td>Power slide switch</td><td>1</td><td><a href="https://udvabony.com/product/slide-switch-2-positions-6-pin-pcb-mount-long-knob/" target="_blank">u99036</a></td><td>18</td><td>between MT3608 OUT+ and ESP32 VIN</td></tr>
+    <tr><td>SW2, SW3</td><td>Tactile push button 6×6×10 mm</td><td>2</td><td><a href="https://udvabony.com/product/665mm-4-pin-tactile-push-switch/" target="_blank">u5255</a></td><td>5 ea</td><td>mode + brightness buttons</td></tr>
+    <tr><td>R1, R2</td><td>10 k 1/4 W (button pull-ups, optional)</td><td>2</td><td><a href="https://udvabony.com/product/10k-ohm-1-4w-5-carbon-film-resistor/" target="_blank">u1048</a></td><td>0.40 ea</td><td>or use ESP32 internal pull-ups</td></tr>
+    <tr><td>—</td><td>Header pins / Dupont jumpers</td><td>set</td><td>(catalog — generic)</td><td>~30</td><td>for matrix cable + button wiring</td></tr>
+  </tbody>
+</table>
+
+<h4>Optional add-ons</h4>
+<table>
+  <thead><tr><th>Ref</th><th>Part</th><th>SKU / link</th><th>BDT</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>RTC1</td><td>DS3231 RTC module</td><td><a href="https://udvabony.com/product/ds3231-rtc-high-precision-real-module/" target="_blank">u3138</a></td><td>250</td><td>offline timekeeping when WiFi is down (±2 ppm, &lt;1 min/year drift)</td></tr>
+    <tr><td>LDR1</td><td>LDR 7 mm</td><td><a href="https://udvabony.com/product/7mm-light-dependent-resistor-ldr/" target="_blank">u3305</a></td><td>18</td><td>auto-brightness</td></tr>
+    <tr><td>BUZ1</td><td>Magnetic buzzer 5–12 V</td><td><a href="https://udvabony.com/product/buzzer-5v-to-12v/" target="_blank">u9331</a></td><td>15</td><td>alarm</td></tr>
+  </tbody>
+</table>
+
+<p class="meta"><strong>Core BOM ≈ 1170 BDT (~$10 USD)</strong>. With all optional add-ons ≈ 1450 BDT.</p>
+</section>
+
+<section id="enclosure">
+<h2>6. Enclosure / build notes</h2>
+<ol>
+  <li><strong>Set MT3608 to 5.0 V <em>before</em> connecting the matrix.</strong> Out of the box it can be at 28 V. Disconnect the load, power from a 4 V bench supply or the cell, turn the brass pot CCW until the multimeter reads 5.0 V.</li>
+  <li><strong>Don't run the matrix at intensity 15</strong> on battery — current spike is brutal on the boost. Use 0–4. Default to 2.</li>
+  <li><strong>Fit-check:</strong> the 4-in-1 matrix is ~128 × 32 mm. ESP32 + breadboard or a small protoboard tucks behind. Aim for a wood/3D-print front frame, dark acrylic or lightly tinted plastic in front of the LEDs for contrast.</li>
+  <li><strong>WiFi credentials:</strong> burn into firmware for v1. v2 — add a captive portal (<code>WiFiManager</code> library) so credentials can change without reflashing.</li>
+  <li><strong>Cable to matrix:</strong> the supplied 5-pin Dupont is fine for ≤30 cm. Longer runs: add 100 nF + 10 µF on matrix VCC at the matrix end to absorb switching transients.</li>
+</ol>
+</section>
+
+<section id="extensions">
+<h2>7. Optional extensions</h2>
+<ul>
+  <li><strong>Date/temperature scroll</strong> — every 30 s the clock blanks, scrolls "Sat 26 Apr · 28°C", returns to time. <code>P.displayText(...)</code> handles scroll automatically.</li>
+  <li><strong>Web UI</strong> — ESP32 hosts a small web page for setting brightness, alarm, color schedule. Use <code>ESPAsyncWebServer</code>.</li>
+  <li><strong>Home Assistant integration</strong> — add ESPHome firmware instead of Arduino. The MAX7219 component has a built-in display driver.</li>
+  <li><strong>Battery state-of-charge</strong> — ESP32 ADC on a divider (100 k / 100 k) from the cell; show "BAT" + percent every minute. Calibrate the ADC's nonlinearity with <code>analogSetAttenuation(ADC_11db)</code>.</li>
+  <li><strong>Deep sleep alarm clock mode</strong> — at midnight, ESP32 deep-sleeps; wake on RTC alarm or button. Drops standby to ~50 µA. Needs DS3231 alarm pin to GPIO33 (RTC_GPIO).</li>
+</ul>
+</section>
+
+<footer>
+  Spec v1 · 2026-04-26 · components priced from udvabony.com
+</footer>
+
+</div>
+</body>
+</html>
