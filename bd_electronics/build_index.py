@@ -26,7 +26,6 @@ MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 SHOPS = {
     "udvabony": "/home/shinzuu/Documents/EEEprojects/udvabony/products.csv",
-    "techshopbd": os.path.join(HERE, "techshopbd/products.csv"),
     "makersbd": os.path.join(HERE, "makersbd/products.csv"),
     "electronics.com.bd": os.path.join(HERE, "electronics_com_bd/products.csv"),
 }

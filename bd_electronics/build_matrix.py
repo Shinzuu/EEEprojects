@@ -30,7 +30,6 @@ from sentence_transformers import SentenceTransformer
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHOPS = [
     ("udvabony", "/home/shinzuu/Documents/EEEprojects/udvabony/products.csv"),
-    ("techshopbd", os.path.join(HERE, "techshopbd/products.csv")),
     ("makersbd", os.path.join(HERE, "makersbd/products.csv")),
     ("electronics.com.bd", os.path.join(HERE, "electronics_com_bd/products.csv")),
 ]
