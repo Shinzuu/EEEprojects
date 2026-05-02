@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3×5 Macropad — Pico direct-wired (no matrix)</title>
+<style>
+  :root{--bg:#0f1115;--panel:#161a22;--ink:#e6e6e6;--muted:#9aa0a6;--accent:#6ee7b7;--accent2:#f59e0b;--warn:#f87171;--ok:#34d399;--link:#93c5fd;--border:#262b36;--code-bg:#0b0d12;}
+  @media (prefers-color-scheme: light){:root{--bg:#fafafa;--panel:#fff;--ink:#1a1a1a;--muted:#555;--accent:#047857;--accent2:#b45309;--warn:#b91c1c;--ok:#15803d;--link:#1d4ed8;--border:#e5e7eb;--code-bg:#f3f4f6;}}
+  *{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:17px;margin:20px 0 8px;color:var(--accent)}h4{font-size:15px;margin:14px 0 6px;color:var(--accent2);text-transform:uppercase;letter-spacing:.04em}
+  p{margin:8px 0}a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+  .meta{color:var(--muted);font-size:13px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:14px 0}
+  .fix{border-left:3px solid var(--ok);background:rgba(52,211,153,.06)}
+  .warn-panel{border-left:3px solid var(--warn);background:rgba(248,113,113,.05)}
+  pre,code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.45}
+  code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:.92em}
+  pre code{background:none;padding:0}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--accent);font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;background:rgba(110,231,183,.12);color:var(--accent);border:1px solid rgba(110,231,183,.3);margin-right:4px}
+  .tag-warn{background:rgba(248,113,113,.12);color:var(--warn);border:1px solid rgba(248,113,113,.3)}
+  .warn{color:var(--warn);font-weight:600}.good{color:var(--ok);font-weight:600}
+  ul,ol{padding-left:22px}li{margin:4px 0}
+  .toc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin:16px 0 28px;font-size:13.5px}
+  .toc ol{margin:4px 0 0;padding-left:22px}
+  hr{border:0;border-top:1px solid var(--border);margin:32px 0}
+  .grid{display:grid;grid-template-columns:repeat(5,minmax(60px,1fr));gap:6px;margin:14px 0;max-width:520px}
+  .key{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px 6px;text-align:center;font-family:ui-monospace,monospace;font-size:13px}
+  .key .gp{display:block;color:var(--accent2);font-size:10.5px;margin-top:3px}
+  footer{color:var(--muted);font-size:12.5px;margin-top:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>3×5 Macropad — Pico direct-wired (no matrix, no diodes)</h1>
+  <p class="meta">
+    15 keys → 15 GPIO on a Raspberry Pi Pico (RP2040). One wire per switch + a shared GND bus.
+    Internal pull-ups, active-low. Firmware: KMK (CircuitPython).
+  </p>
+  <p>
+    <span class="tag">15 keys / 15 pins</span>
+    <span class="tag">no diodes</span>
+    <span class="tag">full NKRO</span>
+    <span class="tag">USB-HID</span>
+    <span class="tag tag-warn">B3F-4055 tact (BD-stocked)</span>
+  </p>
+</header>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#why">Why direct wiring (vs matrix)</a></li>
+    <li><a href="#pico">Pico pin budget</a></li>
+    <li><a href="#layout">Key layout &amp; pin assignment</a></li>
+    <li><a href="#wiring">Wiring diagram</a></li>
+    <li><a href="#bom">BOM (BD-sourced)</a></li>
+    <li><a href="#firmware">Firmware (KMK)</a></li>
+    <li><a href="#build">Build steps</a></li>
+  </ol>
+</nav>
+
+<h2 id="why">1. Why direct wiring (vs matrix)</h2>
+<table>
+  <tr><th>Aspect</th><th>Direct (this build)</th><th>4×4 matrix</th></tr>
+  <tr><td>GPIO used</td><td>15</td><td>8 (4 row + 4 col)</td></tr>
+  <tr><td>Diodes (1N4148)</td><td class="good">0</td><td>16 (one per key, NKRO)</td></tr>
+  <tr><td>Ghosting</td><td class="good">impossible</td><td>requires diodes</td></tr>
+  <tr><td>NKRO</td><td class="good">native</td><td>requires diodes</td></tr>
+  <tr><td>Wiring complexity</td><td>15 wires + 1 GND bus</td><td>8 wires + 16 diodes soldered to switch legs</td></tr>
+  <tr><td>Firmware</td><td>1 line per key</td><td>matrix scan loop</td></tr>
+  <tr><td>BOM cost</td><td class="good">no diode cost</td><td>+16× BDT 2 = ~32 BDT</td></tr>
+</table>
+<p>You said you don't have the diodes (1N4148 / "Xenon" → likely heard "1N4148"). Direct wiring removes that requirement entirely. Pico has the pins — use them.</p>
+
+<h2 id="pico">2. Pico pin budget</h2>
+<ul>
+  <li>RP2040 exposes <strong>26 usable GPIO</strong>: GP0–GP22 (23 pins) + GP26–GP28 (3 ADC-capable pins).</li>
+  <li>GP23, GP24, GP25, GP29 are tied to onboard functions (SMPS, VBUS sense, LED, VSYS divider) — leave alone.</li>
+  <li>15 keys → 15 GPIO → <strong>11 GPIO still free</strong> for future rotary encoder, OLED (I2C on GP4/GP5), RGB strip, etc.</li>
+</ul>
+
+<h2 id="layout">3. Key layout &amp; pin assignment</h2>
+<p>Layout from <code>3x5Print+cut/keyboard-layout.json</code>:</p>
+<div class="grid">
+  <div class="key">Q<span class="gp">GP0</span></div>
+  <div class="key">W<span class="gp">GP1</span></div>
+  <div class="key">E<span class="gp">GP2</span></div>
+  <div class="key">R<span class="gp">GP3</span></div>
+  <div class="key">T<span class="gp">GP4</span></div>
+  <div class="key">A<span class="gp">GP5</span></div>
+  <div class="key">S<span class="gp">GP6</span></div>
+  <div class="key">D<span class="gp">GP7</span></div>
+  <div class="key">F<span class="gp">GP8</span></div>
+  <div class="key">G<span class="gp">GP9</span></div>
+  <div class="key">Z<span class="gp">GP10</span></div>
+  <div class="key">X<span class="gp">GP11</span></div>
+  <div class="key">C<span class="gp">GP12</span></div>
+  <div class="key">V<span class="gp">GP13</span></div>
+  <div class="key">B<span class="gp">GP14</span></div>
+</div>
+<p class="meta">Default keymap = QWERT/ASDFG/ZXCVB to match the printed plate. Easy to remap in firmware.</p>
+
+<table>
+  <tr><th>Pico physical pin</th><th>GPIO</th><th>Key</th><th>Notes</th></tr>
+  <tr><td>1</td><td>GP0</td><td>Q</td><td>row 1</td></tr>
+  <tr><td>2</td><td>GP1</td><td>W</td><td></td></tr>
+  <tr><td>4</td><td>GP2</td><td>E</td><td></td></tr>
+  <tr><td>5</td><td>GP3</td><td>R</td><td></td></tr>
+  <tr><td>6</td><td>GP4</td><td>T</td><td>also I2C0 SDA — swap if you add OLED</td></tr>
+  <tr><td>7</td><td>GP5</td><td>A</td><td>also I2C0 SCL — swap if you add OLED</td></tr>
+  <tr><td>9</td><td>GP6</td><td>S</td><td></td></tr>
+  <tr><td>10</td><td>GP7</td><td>D</td><td></td></tr>
+  <tr><td>11</td><td>GP8</td><td>F</td><td></td></tr>
+  <tr><td>12</td><td>GP9</td><td>G</td><td></td></tr>
+  <tr><td>14</td><td>GP10</td><td>Z</td><td></td></tr>
+  <tr><td>15</td><td>GP11</td><td>X</td><td></td></tr>
+  <tr><td>16</td><td>GP12</td><td>C</td><td></td></tr>
+  <tr><td>17</td><td>GP13</td><td>V</td><td></td></tr>
+  <tr><td>19</td><td>GP14</td><td>B</td><td>row 3 end</td></tr>
+  <tr><td>3, 8, 13, 18, 23, 28, 38</td><td>GND</td><td>—</td><td>any GND pin → common bus rail</td></tr>
+</table>
+
+<div class="panel">
+<strong>If you add OLED later:</strong> move T (GP4) and A (GP5) to GP15 and GP16. I2C0 needs GP4/GP5 free.
+</div>
+
+<h2 id="wiring">4. Wiring diagram</h2>
+<pre><code>                      Raspberry Pi Pico
+                  ┌─────────────────────────┐
+   Q ────────────►│ GP0  (pin 1)            │
+   W ────────────►│ GP1  (pin 2)            │
+                  │      (pin 3)  GND ◄─┐   │
+   E ────────────►│ GP2  (pin 4)        │   │
+   R ────────────►│ GP3  (pin 5)        │   │
+   T ────────────►│ GP4  (pin 6)        │   │
+   A ────────────►│ GP5  (pin 7)        │   │
+                  │      (pin 8)  GND ◄─┤   │
+   S ────────────►│ GP6  (pin 9)        │   │
+   D ────────────►│ GP7  (pin 10)       │   │   ← common GND bus
+   F ────────────►│ GP8  (pin 11)       │   │     (1 wire from
+   G ────────────►│ GP9  (pin 12)       ├───┘      every switch's
+                  │      (pin 13) GND ◄─┤          2nd terminal)
+   Z ────────────►│ GP10 (pin 14)       │
+   X ────────────►│ GP11 (pin 15)       │
+   C ────────────►│ GP12 (pin 16)       │
+   V ────────────►│ GP13 (pin 17)       │
+                  │      (pin 18) GND ◄─┘
+   B ────────────►│ GP14 (pin 19)       │
+                  │ ...                 │
+                  │      (pin 40) VBUS  │ ← USB 5V (not used)
+                  └─────────────────────┘
+
+Each switch (B3F-4055, 4-pin tact):
+
+           pin1 ──┐         ┌── pin3
+                  │  switch │           pin1 ↔ pin2 internally
+                  │  body   │           pin3 ↔ pin4 internally
+           pin2 ──┘         └── pin4    closes pin1↔pin3 when pressed
+
+   Wire ONE leg from one side  → GPIO (e.g. GP0)
+   Wire ONE leg from other side → GND bus
+
+   You only need 2 of the 4 legs. The other 2 are for PCB stability.</code></pre>
+
+<div class="panel fix">
+<strong>No pull-up resistors needed.</strong> Pico's RP2040 has internal pull-ups (~50 kΩ). Firmware enables them. Pin reads HIGH idle, LOW when pressed.
+</div>
+
+<h2 id="bom">5. BOM (BD-sourced)</h2>
+<table>
+  <tr><th>Qty</th><th>Part</th><th>Source</th><th>Unit BDT</th><th>Subtotal</th></tr>
+  <tr>
+    <td>1</td>
+    <td>Raspberry Pi Pico (RP2040)</td>
+    <td><a href="https://makersbd.com/product/raspberry-pi-pico-board-rp2040-dual-core-264kb-arm-low-power-microcomputer-high-performance-84" target="_blank" rel="noopener">makersbd</a></td>
+    <td>450</td>
+    <td>450</td>
+  </tr>
+  <tr>
+    <td>15</td>
+    <td>B3F-4055 tactile switch (12×12×7.3 mm)</td>
+    <td><a href="https://udvabony.com/product/12x12x73mm-momentary-tactile-push-switch/" target="_blank" rel="noopener">udvabony u5454</a></td>
+    <td>5</td>
+    <td>75</td>
+  </tr>
+  <tr>
+    <td>15</td>
+    <td>Round caps for B3F (optional, multi-color)</td>
+    <td>udvabony B3F caps</td>
+    <td>5</td>
+    <td>75</td>
+  </tr>
+  <tr>
+    <td>1 m</td>
+    <td>Hookup wire (28 AWG, multi-color)</td>
+    <td>udvabony</td>
+    <td>~50</td>
+    <td>50</td>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>USB micro-B cable</td>
+    <td>local / on hand</td>
+    <td>—</td>
+    <td>—</td>
+  </tr>
+  <tr><td colspan="4" style="text-align:right"><strong>Total</strong></td><td><strong>~650 BDT</strong></td></tr>
+</table>
+
+<p class="meta">Skipped: 1N4148 diodes (not needed), shift register / IO expander (not needed), PCB (you have the print+cut plate already).</p>
+
+<h2 id="firmware">6. Firmware (KMK / CircuitPython)</h2>
+
+<h3>Setup (one-time)</h3>
+<ol>
+  <li>Hold BOOTSEL on Pico, plug USB → mounts as <code>RPI-RP2</code> drive.</li>
+  <li>Flash CircuitPython UF2: <a href="https://circuitpython.org/board/raspberry_pi_pico/" target="_blank" rel="noopener">circuitpython.org/board/raspberry_pi_pico</a>. Drag UF2 onto the drive — Pico reboots as <code>CIRCUITPY</code> drive.</li>
+  <li>Download KMK: <a href="https://github.com/KMKfw/kmk_firmware" target="_blank" rel="noopener">github.com/KMKfw/kmk_firmware</a>. Copy the <code>kmk/</code> folder to <code>CIRCUITPY/</code>.</li>
+  <li>Save <code>code.py</code> below to <code>CIRCUITPY/code.py</code>. Pico reboots and enumerates as a USB keyboard immediately.</li>
+</ol>
+
+<h3><code>code.py</code></h3>
+<pre><code>import board
+from kmk.kmk_keyboard import KMKKeyboard
+from kmk.scanners.keypad import KeysScanner
+from kmk.keys import KC
+
+keyboard = KMKKeyboard()
+
+# 15 keys, direct-wired, one GPIO per key, common GND.
+# Order matches the visual layout: row1 left→right, row2, row3.
+PINS = [
+    board.GP0, board.GP1, board.GP2, board.GP3, board.GP4,   # Q W E R T
+    board.GP5, board.GP6, board.GP7, board.GP8, board.GP9,   # A S D F G
+    board.GP10, board.GP11, board.GP12, board.GP13, board.GP14,  # Z X C V B
+]
+
+keyboard.matrix = KeysScanner(
+    pins=PINS,
+    value_when_pressed=False,   # active-low (pin shorted to GND)
+    pull=True,                  # enable internal pull-up
+)
+
+# Default keymap — replace with macros / media keys / mod combos as needed.
+keyboard.keymap = [[
+    KC.Q, KC.W, KC.E, KC.R, KC.T,
+    KC.A, KC.S, KC.D, KC.F, KC.G,
+    KC.Z, KC.X, KC.C, KC.V, KC.B,
+]]
+
+if __name__ == '__main__':
+    keyboard.go()
+</code></pre>
+
+<h3>Macro examples (drop in place of plain letters)</h3>
+<pre><code>from kmk.modules.macros import Macros, Press, Release, Tap, Delay
+from kmk.handlers.sequences import simple_key_sequence, send_string
+
+macros = Macros()
+keyboard.modules.append(macros)
+
+# Ctrl+C, Ctrl+V on first two keys
+COPY  = KC.LCTL(KC.C)
+PASTE = KC.LCTL(KC.V)
+
+# Type a string
+SIG = send_string('shinzuu@abbottmlabs.com')
+
+# Media: play/pause, vol up, vol down
+PLAY = KC.MEDIA_PLAY_PAUSE
+VUP  = KC.AUDIO_VOL_UP
+VDN  = KC.AUDIO_VOL_DOWN
+
+keyboard.keymap = [[
+    COPY, PASTE, KC.LCTL(KC.Z), KC.LCTL(KC.Y), SIG,
+    KC.F13, KC.F14, KC.F15, KC.F16, KC.F17,
+    PLAY,  VDN,    VUP,    KC.MUTE, KC.MEDIA_NEXT_TRACK,
+]]
+</code></pre>
+<p class="meta">F13–F24 are real HID keys most OSes don't bind to anything by default — perfect for global hotkey targets in OBS, Davinci, browser extensions.</p>
+
+<h2 id="build">7. Build steps</h2>
+<ol>
+  <li><strong>Mount switches in plate.</strong> Use the print+cut plate from <code>3x5Print+cut/plate_A4.pdf</code>. B3F-4055 is friction-fit in 12.5 × 12.5 mm cutouts.</li>
+  <li><strong>Bend &amp; bus the GND legs.</strong> Pick one corner pair on each switch (say bottom-left + bottom-right). Bend the chosen GND leg of every switch flat and solder a single bare wire across all 15 of them — that's your GND bus.</li>
+  <li><strong>Run the GPIO wires.</strong> Cut 15 lengths of hookup wire (~10 cm each). Solder one end to the OTHER leg of each switch, route to the Pico, solder to the assigned GP pin.</li>
+  <li><strong>Bus the Pico GND.</strong> One wire from any Pico GND pin (3, 8, 13, 18, 23, 28, or 38) → the switch GND bus.</li>
+  <li><strong>Flash firmware</strong> per §6.</li>
+  <li><strong>Test.</strong> Plug into PC. Open a text editor. Press each key in turn — should type Q W E R T / A S D F G / Z X C V B. Any dead key = check that switch's two solder joints.</li>
+</ol>
+
+<div class="panel fix">
+<strong>Sanity check before powering up:</strong> with the Pico unplugged, multimeter in continuity mode — touch one probe to the GND bus, the other to each GPIO wire in turn. Should beep ONLY when you press the corresponding switch. If it beeps without pressing, you have a short.
+</div>
+
+<hr>
+<footer>
+  3×5 macropad spec — Pico direct-wired. Built from EEEprojects local-source workflow.
+  Pico from <a href="https://makersbd.com" target="_blank">makersbd</a>, switches from <a href="https://udvabony.com" target="_blank">udvabony</a>.
+</footer>
+
+</div>
+</body>
+</html>

@@ -3,3 +3,11 @@ __pycache__/
 *.pyc
 .DS_Store
 udvabony/scrape.log
+
+# Vial-QMK cloned locally for builds; not part of this repo.
+vial-qmk/
+
+# Cart / shopping sheets are generated artefacts.
+cart.html
+shopping_list.html
+shopping_list_print.html

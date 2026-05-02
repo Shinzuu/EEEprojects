@@ -8,6 +8,7 @@ Personal electronics workbench. The user (Shinzuu, BD-region) builds DIY hardwar
 - **`bd_electronics/`** — multi-shop scraper that adds two more BD shops (makersbd.com, electronics.com.bd) and produces a cross-shop comparison matrix. ~6900 products total, 307 confirmed on 2+ shops.
 - **`1.usb mic/`** — DIY USB condenser microphone build. Reference docs from the DIY Perks + ElectroNoobs videos and a v2 validated schematic with every BOM row linked to udvabony.
 - **`2.digital clock/`** — ESP32 + MAX7219 4×(8×8) WiFi clock, 18650-powered. Spec + Arduino sketch + linked BOM.
+- **`3.macro pads/`** — 3×5 (15-key) USB macropad on a Raspberry Pi Pico (RP2040). Direct-pin matrix (no diodes), B3F-4055 tact switches in a print+cut plate, Vial-QMK firmware so the keymap can be edited live in Chrome at vial.rocks. Spec, mapping wizard, and pin map are all here.
 
 GitHub: <https://github.com/Shinzuu/EEEprojects>
 
@@ -75,6 +76,40 @@ The mic project went through a v1 → v2 cycle because v1 had:
 
 These were caught by an explicit **validation pass** (skeptical agent reads the schematic and looks for unbuildable / broken bits). For any non-trivial schematic, do that pass before building HTML / committing. The `simplify` skill is also available.
 
+## How the macropad is wired & flashed (3.macro pads)
+
+A 3-row × 5-column USB macropad on a Raspberry Pi Pico (RP2040). Each switch wires **directly** between one GPIO and a shared GND bus — no diode matrix, no shift register, no IO expander. RP2040's internal pull-ups make the switch read LOW when pressed. The case is glued shut, so flashing relies on a **firmware-triggered** entry into BOOTSEL rather than the physical button.
+
+The actual pin map (row-major, captured by the in-browser mapping wizard at `3.macro pads/map_wizard.py`):
+
+```
+row 0: GP22, GP19, GP2,  GP5, GP8
+row 1: GP21, GP18, GP3,  GP6, GP9
+row 2: GP20, GP17, GP4,  GP7, GP10
+```
+
+Free GPIO that remain: GP0, GP1, GP11–GP16, GP26–GP28 (11 pins) — room for an OLED, encoder, or RGB strip later.
+
+Firmware history: started on **KMK / CircuitPython** for fast iteration, then switched to **Vial-QMK** so the keymap can be remapped live in Chrome at <https://vial.rocks> (WebHID). KMK can't speak the VIA HID protocol, hence the migration.
+
+Build location for Vial-QMK is `vial-qmk/` (gitignored — it's a 1+ GB clone with submodules). Keyboard definition is checked in at `vial-qmk/keyboards/handwired/shinzuu_3x5/` but only the small kb-specific files matter; rebuild with:
+
+```bash
+cd vial-qmk && qmk compile -kb handwired/shinzuu_3x5 -km vial
+# Output: vial-qmk/handwired_shinzuu_3x5_vial.uf2  (~94 KB)
+```
+
+To flash without opening the case:
+1. In Vial → "Reset to Bootloader" (sends `KC.BOOTLOADER` over HID).
+2. Pico unmounts and reappears as `RPI-RP2`.
+3. `cp vial-qmk/handwired_shinzuu_3x5_vial.uf2 /media/shinzuu/RPI-RP2/`.
+
+If Vial isn't running and you need to bootstrap from KMK, the legacy `code.py` had a `Q + T + B` chord (top-left + top-right + bottom-right) bound to `KC.BOOTLOADER` via the KMK Combos module — useful as a last-resort recovery if Vial flash ever bricks.
+
+The probe script `3.macro pads/probe_viewer.py` is kept around as a debugging aid — it reads the CircuitPython serial event stream and shows which GPIO is shorting to GND in a live HTML dashboard at <http://127.0.0.1:8000>. Useful for tracking down a dead key or short before opening the case.
+
+A udev rule (`/etc/udev/rules.d/99-vial-hidraw.rules`) grants Chrome's WebHID access to VIDs `0x5348` (this keyboard), `0x239a` (Adafruit/CircuitPython), `0x2e8a` (Raspberry Pi). Without it, vial.rocks can't see the device.
+
 ## Shell / power architecture defaults for the user
 
 - Linux (Ubuntu 24.04, zsh). PEP 668 system Python — must use a `venv`. The udvabony venv at `udvabony/.venv` already has sentence-transformers / faiss-cpu / pandas / numpy installed.
@@ -112,4 +147,12 @@ cd /home/shinzuu/Documents/EEEprojects/bd_electronics
 # Open both schematics in Chrome
 google-chrome "/home/shinzuu/Documents/EEEprojects/1.usb mic/schematic.html" \
               "/home/shinzuu/Documents/EEEprojects/2.digital clock/schematic.html"
+
+# Macropad: live GPIO probe (run while plugged in, then short pins to GND)
+/home/shinzuu/Documents/EEEprojects/udvabony/.venv/bin/python \
+    "/home/shinzuu/Documents/EEEprojects/3.macro pads/probe_viewer.py"
+
+# Macropad: rebuild Vial-QMK firmware
+cd /home/shinzuu/Documents/EEEprojects/vial-qmk
+qmk compile -kb handwired/shinzuu_3x5 -km vial
 ```
