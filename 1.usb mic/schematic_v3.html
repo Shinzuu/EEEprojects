@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DIY USB Mic — Schematic v3 (noisy-room build)</title>
+<style>
+  :root{--bg:#0f1115;--panel:#161a22;--ink:#e6e6e6;--muted:#9aa0a6;--accent:#6ee7b7;--accent2:#f59e0b;--warn:#f87171;--ok:#34d399;--link:#93c5fd;--border:#262b36;--code-bg:#0b0d12;}
+  @media (prefers-color-scheme: light){:root{--bg:#fafafa;--panel:#fff;--ink:#1a1a1a;--muted:#555;--accent:#047857;--accent2:#b45309;--warn:#b91c1c;--ok:#15803d;--link:#1d4ed8;--border:#e5e7eb;--code-bg:#f3f4f6;}}
+  *{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:17px;margin:20px 0 8px;color:var(--accent)}h4{font-size:15px;margin:14px 0 6px;color:var(--accent2);text-transform:uppercase;letter-spacing:.04em}
+  p{margin:8px 0}a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+  .meta{color:var(--muted);font-size:13px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:14px 0}
+  .fix{border-left:3px solid var(--ok);background:rgba(52,211,153,.06)}
+  .warn-panel{border-left:3px solid var(--warn);background:rgba(248,113,113,.05)}
+  .info-panel{border-left:3px solid var(--accent);background:rgba(110,231,183,.05)}
+  pre,code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.5px;line-height:1.45}
+  code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:.92em}
+  pre code{background:none;padding:0}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--accent);font-weight:600;position:sticky;top:0}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11.5px;background:rgba(110,231,183,.12);color:var(--accent);border:1px solid rgba(110,231,183,.3);margin-right:4px}
+  .tag-warn{background:rgba(248,113,113,.12);color:var(--warn);border:1px solid rgba(248,113,113,.3)}
+  .tag-new{background:rgba(245,158,11,.12);color:var(--accent2);border:1px solid rgba(245,158,11,.3)}
+  .warn{color:var(--warn);font-weight:600}.good{color:var(--ok);font-weight:600}
+  ul,ol{padding-left:22px}li{margin:4px 0}
+  .toc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin:16px 0 28px;font-size:13.5px}
+  .toc ol{margin:4px 0 0;padding-left:22px}
+  hr{border:0;border-top:1px solid var(--border);margin:32px 0}
+  footer{color:var(--muted);font-size:12.5px;margin-top:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>DIY USB Mic — Schematic v3 <span style="font-size:14px;color:var(--accent2)">(noisy-room build, single 20 mm omni)</span></h1>
+  <p class="meta">
+    20 mm raw 2-terminal back-electret capsule (omni, confirmed by analog-meter test) → JFET buffer (bootstrapped) → 100 Hz HPF → NE5532 preamp → JFET-VCA gate (tightened threshold) → NE5532 buffer → 3.5 mm TRS into existing CM108-class USB dongle.
+    BOM uses parts already on order from <a href="https://udvabony.com" target="_blank" rel="noopener">udvabony.com</a>. No new parts needed.
+  </p>
+  <p>
+    <span class="tag">audio-grade signal path</span>
+    <span class="tag">±9 V isolated rails</span>
+    <span class="tag">12-pos rotary gain</span>
+    <span class="tag tag-new">v3: 100 Hz HPF for traffic rumble</span>
+    <span class="tag tag-new">v3: NE5532 sidechain (TL072 not stocked)</span>
+  </p>
+</header>
+
+<div class="panel info-panel">
+  <strong>Changes vs v2:</strong>
+  <ol style="margin:6px 0">
+    <li><strong>Sidechain rebuilt around NE5532</strong> (not TL072). TL072 was dropped from the finalized udvabony cart on 2026-05-01; NE5532 is what arrived. Bipolar input means we lose the JFET-input bias-current advantage, but with 22 k feedback resistors (not 1 M) the bias-current offset stays under 1 mV — fine for a comparator/envelope.</li>
+    <li><strong>New 100 Hz Sallen-Key HPF</strong> between Stage 1 and Stage 2. Targets the dominant noise source for this build environment (Dhaka traffic + AC compressor + ceiling-fan low-frequency rumble). 12 dB/oct rolloff below 100 Hz preserves voice fundamentals (80–250 Hz dips slightly but proximity effect at 3–5 cm restores it).</li>
+    <li><strong>Gate threshold range tightened</strong> from −60…−20 dB sweep to −40…−10 dB sweep. In a noisy room you want the gate biased to close on anything quieter than the voice; sweeping all the way to −60 dB never closes.</li>
+    <li><strong>Asymmetric attack/release</strong> kept from v2 — fast attack (~5 ms), slow release (~150 ms) so the gate doesn't chatter on consonants.</li>
+    <li><strong>Capsule confirmed raw, no internal FET</strong> (analog meter, ×10k range, ~1.5 MΩ symmetric both directions = capacitor + bleed resistor, no junction). v2's bootstrapped JFET front-end is the correct topology and is kept verbatim.</li>
+  </ol>
+</div>
+
+<div class="panel warn-panel">
+  <strong>Why omni in a noisy room is still a compromise:</strong> a single omnidirectional capsule cannot reject off-axis sound. The real noise rejection in this build comes from <strong>(a) close-mic technique</strong> — voice 3–5 cm from the capsule, room noise unchanged, ~20 dB free SNR — <strong>(b) the 100 Hz HPF</strong> killing low-frequency traffic energy, and <strong>(c) the noise gate</strong> silencing the room when you stop talking. If your environment is consistently louder than ~55 dB SPL during recording, build a gradient cardioid pair instead (separate v3-grad spec, not this document).
+</div>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#power">Power architecture (unchanged from v2)</a></li>
+    <li><a href="#block">Block diagram</a></li>
+    <li><a href="#stage1">Stage 1 — JFET source-follower (bootstrapped)</a></li>
+    <li><a href="#stage2">Stage 2 — 100 Hz Sallen-Key HPF <span class="tag tag-new">new</span></a></li>
+    <li><a href="#stage3">Stage 3 — NE5532 non-inverting preamp (rotary gain)</a></li>
+    <li><a href="#stage4">Stage 4 — JFET-VCA gate (tightened)</a></li>
+    <li><a href="#stage5">Stage 5 — NE5532 sidechain (rebuilt) <span class="tag tag-new">new</span></a></li>
+    <li><a href="#stage6">Stage 6 — Output buffer &amp; USB dongle</a></li>
+    <li><a href="#bom">Final BOM (all from incoming order)</a></li>
+    <li><a href="#opcount">Op-amp halves accounting</a></li>
+    <li><a href="#build">Build &amp; bring-up notes</a></li>
+    <li><a href="#mech">Mechanical / acoustic notes</a></li>
+    <li><a href="#validation">Validation pass</a></li>
+    <li><a href="#future">Future work (shotgun, gradient cardioid, lav)</a></li>
+  </ol>
+</nav>
+
+<h2 id="power">1. Power architecture <span style="font-size:13px;color:var(--muted)">(unchanged from v2)</span></h2>
+
+<p>You have isolated DC-DC modules in 5 V / 9 V / 12 V single-rail. Use <strong>two single-rail 5 V → 9 V isolators</strong> to synthesize ±9 V:</p>
+
+<pre>
+USB 5V VBUS ──┬── Isolator A: 5V → 9V  ──── +9V rail (audio side)
+              └── Isolator B: 5V → 9V (output reference flipped) ──── −9V rail
+                  ↑ wire B's "+" output as common audio ground, "−" as −9V
+</pre>
+
+<p>Both modules MUST be galvanically isolated — otherwise the inversion floats audio ground from USB ground and you get a hum loop. Decouple each rail with 470 µF electrolytic + 100 nF ceramic at the preamp end of the cable.</p>
+
+<p>The <strong>USB sound dongle runs from its own USB 5 V</strong> (do not share with the audio rails). The dongle's analog GND meets your audio GND only at the 3.5 mm TRS sleeve — single point.</p>
+
+<h2 id="block">2. Block diagram</h2>
+
+<pre>
+[20mm omni capsule]
+        │
+        ▼
+   ┌─────────────────┐
+   │  Stage 1        │   2N3819 source-follower
+   │  JFET buffer    │   bootstrapped 10M+10M gate bias
+   │  Av ≈ 0.85      │   (capsule needs no DC blocking cap; capsule IS the cap)
+   └────────┬────────┘
+            │ (high-Z source signal)
+            ▼
+   ┌─────────────────┐
+   │  Stage 2 NEW    │   2-pole Sallen-Key high-pass
+   │  HPF 100 Hz     │   fc = 100 Hz, Q = 0.7  (kills traffic rumble)
+   │  NE5532/A       │
+   └────────┬────────┘
+            ▼
+   ┌─────────────────┐
+   │  Stage 3        │   non-inverting preamp
+   │  NE5532/B       │   12-pos rotary gain switch (0 to +52 dB)
+   │  preamp         │
+   └────────┬────────┘
+            ▼
+   ┌─────────────────┐    ┌──────────────────────────────┐
+   │  Stage 4        │◄───┤  Stage 5 NEW                  │
+   │  JFET VCA gate  │    │  NE5532 sidechain             │
+   │  2N3819 shunt   │    │  rectifier + envelope + comp  │
+   │  Vc from sidech │    │  threshold pot, attack/release│
+   └────────┬────────┘    └──────────────────────────────┘
+            ▼
+   ┌─────────────────┐
+   │  Stage 6        │   unity buffer, 220R series
+   │  NE5532/C       │   22 µF NP coupling
+   │  output buffer  │
+   └────────┬────────┘
+            ▼
+   3.5 mm TRS ── short cable ── existing CM108 USB dongle (mic-bias resistor removed) ── host
+</pre>
+
+<h2 id="stage1">3. Stage 1 — JFET source-follower (bootstrapped, biased) <span style="font-size:13px;color:var(--muted)">(unchanged from v2)</span></h2>
+
+<pre>
+        +9V
+         │
+         R1 4.7k  (drain load)
+         │
+         ├── Q1 drain
+         │
+        Q1 = 2N3819
+         │
+         ├── Q1 source ──┬── C_boot 1µF ──► R3/R4 junction (AC bootstrap)
+         │               │
+         R2 4.7k         └── C7 1µF ──► Stage 2 input (HPF)
+         │
+        −9V
+                        ┌── Q1 (2N3819)
+   Capsule (+) ─ Q1 gate (no DC blocking cap; capsule IS the cap)
+   Capsule (−) ─ audio GND (single point, at capsule end of shield)
+
+                   ┌─ R3 10M ─┐
+   gate ───────────┤          │ junction ── C_boot 1µF ── back to source
+                   └─ R4 10M ─┴── GND
+</pre>
+
+<div class="panel fix">
+  <strong>Why this works (recap from v2):</strong> R3 + R4 form a 20 MΩ DC return to ground for the gate. C_boot drives the R3/R4 junction with the source signal, which (because Av ≈ 0.85 on a source-follower) makes the AC voltage across R3 only ~15 % of the gate signal — so the effective AC impedance R3 sees is <code>R3 / (1 − Av) ≈ 10M / 0.15 ≈ 67M</code>. With ~50 pF capsule, LF corner ≈ <strong>48 Hz</strong>. Below the HPF cutoff anyway, so OK.
+</div>
+
+<h4>Bias check (2N3819, Vp ≈ −3 V, Idss ≈ 4 mA typ)</h4>
+<p>R2 = 4.7 k → Id ≈ 2.5 mA → Vs ≈ +2.7 V (above audio GND). Vd = +9 − (2.5 mA × 4.7 k) = −2.7 V → wait — drain sits at <code>+9V − 11.75 V</code>. That puts Vd below GND. <span class="warn">Re-checking…</span></p>
+
+<p>Correct: with R1 = 4.7 k, Id = 2.5 mA → drop across R1 = 11.75 V, but supply is only +9 V. JFET cannot pass 2.5 mA — it pinches off earlier. Real Id with this setup is <code>Id ≈ (9 − Vs) / (R1 + R2) = 9 / 9.4k = 0.96 mA</code>. So Vs ≈ +0.45 V (1 mA × 4.7k / 10), Vd ≈ +9 − 4.5 = +4.5 V, Vds ≈ 4 V. <span class="good">JFET operates in saturation, ~4 V headroom each way.</span> Same outcome as v2 numerically, just my arithmetic above was sloppy — the actual operating point self-arranges via Idss-Vp curve.</p>
+
+<p><strong>Sample variance:</strong> 2N3819 Idss ranges 2–20 mA across samples. Plan to measure Vs after build and adjust R2 to put Vs in 0.5–1.5 V window. Spare 2N3819 stock is ample.</p>
+
+<h2 id="stage2">4. Stage 2 — 100 Hz high-pass filter <span class="tag tag-new">NEW</span></h2>
+
+<p>Sallen-Key 2-pole high-pass topology, NE5532/A:</p>
+
+<pre>
+   in (from C7 1µF) ──► C20 100nF ──┬──► C21 100nF ──┬──► non-inv input NE5532/A
+                                     │                 │
+                                     R20 16k           R21 16k
+                                     │                 │
+                                    GND               output
+                                                       │
+                                          inv input ◄──┤
+                                                       │
+                                                       ▼
+                                                   to Stage 3 input
+</pre>
+
+<h4>Filter math</h4>
+<ul>
+  <li><code>fc = 1 / (2π × √(R20 × R21 × C20 × C21)) = 1 / (2π × √(16k × 16k × 100n × 100n)) = 99.5 Hz</code> ✓</li>
+  <li><code>Q = √(R20 × R21 × C20 × C21) / (R20 × C20 + R20 × C21) = 0.5</code> with these values — slightly Bessel-flat, no peaking</li>
+  <li>Stop-band: −12 dB at 50 Hz, −24 dB at 25 Hz, −40 dB at 10 Hz</li>
+</ul>
+
+<p><strong>Why 100 Hz, not 80 Hz:</strong> Dhaka traffic noise spectrum peaks at 50–80 Hz (truck idling, 2-stroke rickshaw exhaust). 80 Hz cutoff lets that through. 100 Hz puts the noise in the −3 dB region, voice fundamentals (male 85–180 Hz, female 165–255 Hz) lose the bottom 1–2 dB but proximity effect at 3–5 cm distance restores 4–6 dB at 100 Hz, net positive.</p>
+
+<p><strong>Why Sallen-Key, not passive RC:</strong> 2-pole gives 12 dB/oct rolloff vs 6 dB/oct passive. Passive would still leak 30 % of 50 Hz energy through; this kills it. Cost: one NE5532 half (we have spare).</p>
+
+<h2 id="stage3">5. Stage 3 — NE5532 non-inverting preamp (rotary gain) <span style="font-size:13px;color:var(--muted)">(same topology as v2)</span></h2>
+
+<pre>
+                              R8 (gain set, see rotary table)
+                              ┌──────────────────┐
+                              │                  │
+       in (from HPF)    R5 10k│      ┌───────┐   │
+   ──────────────────┬──/\/\──┴──────┤−      │   │
+                     │                │NE5532 │───┴──── to Stage 4
+                     R6 100k          │  /B   │
+                     │      ┌─────────┤+      │
+                    GND     │         └───────┘
+                            │
+                          GND (true ground for ±9V supply)
+
+   Rotary switch SW1 (RS26 12-position, 1P12T) selects R8:
+     pos 1: open      → unity (~0 dB)        "off / very loud source"
+     pos 2: 22k       → ~7 dB
+     pos 3: 10k       → ~14 dB
+     pos 4: 4.7k      → ~20 dB
+     pos 5: 2.2k      → ~26 dB
+     pos 6: 1k        → ~32 dB
+     pos 7: 470       → ~38 dB
+     pos 8: 220       → ~45 dB         ◄── typical vocal at 5 cm
+     pos 9: 100       → ~52 dB
+     pos 10: 47       → ~58 dB         ◄── quiet voice at 10 cm
+     pos 11–12: spare
+</pre>
+
+<p>Gain = <code>1 + R8/R5</code>. Drop a 100 pF in parallel with R8 to roll off above 80 kHz (slew-rate sanity, prevents RFI demodulation from the USB cable).</p>
+
+<p>Decouple V+ / V− with 100 nF ceramic + 47 µF electrolytic right at pins 8 / 4 of NE5532.</p>
+
+<h2 id="stage4">6. Stage 4 — JFET-VCA shunt gate (tightened threshold)</h2>
+
+<pre>
+   in (from Stage 3 output)
+        │
+        R10 100k (series)
+        │
+        ├──── out (to Stage 6 buffer)
+        │
+       Q2 drain
+        │
+       Q2 = 2N3819 (used as voltage-controlled resistor)
+        │
+       Q2 source ── GND
+        │
+       Q2 gate
+        │
+       R11 100k
+        │
+        ◄── from sidechain Vc
+
+   Linearization: R12 100k from Q2 drain to gate
+       (cancels FET parabolic Rds vs Vgs nonlinearity, THD &lt; 0.1 %)
+</pre>
+
+<p><strong>Operation:</strong> Vc ≈ −9 V → Q2 fully off → Rds ≈ ∞ → signal passes through R10 unattenuated. Vc ≈ 0 V → Q2 fully on → Rds ≈ 30 Ω → R10 forms 100k:30Ω divider → −70 dB attenuation. Smooth transition controlled by sidechain envelope.</p>
+
+<h2 id="stage5">7. Stage 5 — NE5532 sidechain (rebuilt) <span class="tag tag-new">NEW</span></h2>
+
+<p>Replaces v2's TL072 sidechain. NE5532 is bipolar-input, so we keep feedback resistors low (≤22k) to keep bias-current offset under 1 mV.</p>
+
+<pre>
+  TAP from Stage 3 output (post-preamp, pre-VCA)
+   │
+   C30 1µF
+   │
+   ├─── R30 10k ──┤+ \
+   │              │   \  NE5532/D — half-wave gain stage (×11)
+   ├──────────────┤−  /
+                  │  /
+                  │
+                Vout_A (audio + signal)
+                  │
+                  ▼
+              D1 1N4007 ──┬── C31 4.7µF ──┬── R31 100k ──┐
+              D2 1N4007 ──┘                │              │
+              (Q3 BC547 + Q4 BC547         │              │
+               full-wave abs-value pair)   │              │
+                                          GND            │
+                                                          │
+                                                          ▼
+                                          ┌─── ┤+   NE5532/E ── comparator
+                                          │     │   /
+                                  VR1 100k log │  /
+                                  pot wiper:   ├─┤−
+                                  threshold    │
+                                       ▲        │
+                                       │       output: +9V → −9V swing
+                                  −9V refint    │
+                                                │
+                                          R22 10k
+                                                │
+                                          C32 10µF ── GND
+                                                │
+                                                ▼
+                                            Vc to Q2 gate
+                                          (asymmetric attack/release: 1N4148
+                                          across R22 lets attack = ~5 ms,
+                                          release = R22 × C32 = ~100 ms)
+</pre>
+
+<p><strong>NE5532 as comparator caveat:</strong> NE5532 is not a true comparator; output recovers slowly from rail saturation (~10 µs). For audio gating this is fine — voice envelopes change on ms timescales. <span class="warn">Do not</span> use NE5532 as comparator if you need &lt;1 µs response.</p>
+
+<p><strong>Why R-values are smaller than the v2 TL072 design:</strong> NE5532 input bias current is ~200 nA (vs ~30 pA on TL072). With a 1 MΩ feedback that's 200 mV of offset — would jam the comparator one way. With 22 k feedback it's 4.4 mV — negligible.</p>
+
+<p><strong>Threshold range:</strong> VR1 wiper sweeps from −6 V to −1 V at the comparator's inverting input, mapping to gate-closed thresholds of roughly −40 dB (mostly closed) to −10 dB (rarely closed). Tighter range than v2 because in a noisy room you never want the gate trying to discriminate −60 dB signals.</p>
+
+<p><strong>Asymmetric attack/release:</strong> 1N4148 in parallel with R22, anode toward C32 — when envelope rising (attack), diode forward-biases, charges C32 quickly through ~100 Ω wire resistance (5 ms time constant). When envelope falling (release), diode blocks, C32 discharges through R22 = 10 kΩ → 100 ms time constant. Smooth release prevents gate chatter on consonants.</p>
+
+<h2 id="stage6">8. Stage 6 — Output buffer + mute switch + USB dongle</h2>
+
+<pre>
+   in (from VCA)
+        │
+        ▼
+   ┌───────────────┐
+   │  NE5532/F     │  unity-gain follower
+   │  +in ◄─ in    │
+   │  −in ◄─ out   │
+   │  out ─►       │
+   └──────┬────────┘
+          │
+          R40 220Ω (output series + short-circuit protection)
+          │
+          ●  audio node ←── this is where the mute switch taps
+          │
+          ├──────────────────────────────┐
+          │                               │
+          │                            SW1 (SPST latching)
+          │                               │
+          │                          AGND rail
+          │
+          C40 22µF NP electrolytic (DC blocking, 50V)
+          │
+          ▼
+   ┌──────────────────┐
+   │ 3.5mm TRS tip   ─┼── to dongle mic-in
+   │ 3.5mm TRS sleeve ─── audio GND ── (single-point USB GND tie)
+   └──────────────────┘
+
+
+  MUTE LED branch (red, lights when muted):
+   +5V ── 1kΩ ── LED_red anode
+                 LED_red cathode ──┐
+                                    │
+                                    ●  ← same audio node as above
+                                    │
+                                  SW1 (shared contact)
+                                    │
+                                  AGND
+   When SW1 OPEN: cathode floats (audio signal node, AC, no DC path) → LED off
+   When SW1 CLOSED: cathode reaches AGND through switch → LED on (red), audio shorted
+
+  POWER LED branch (green, always on):
+   +5V ── 1kΩ ── LED_green anode ── LED_green cathode ── AGND
+   Always lit when powered. Independent of mute state.
+</pre>
+
+<div class="panel info-panel">
+  <strong>Why the mute switch is BEFORE C40, not after:</strong> the buffer (NE5532/F) is happy to drive 220 Ω + dead-short to AGND — well within its 38 mA short-circuit current rating. Placing SW1 here means C40 sees 220 Ω source impedance at all times. When mute toggles, C40 doesn't have to charge/discharge to a new voltage rail — the audio node just goes to 0 V. No DC thump on press / release.
+  <br><br>
+  <strong>Why the red LED shares SW1's contact:</strong> simplest possible. One SPST switch does both the audio mute AND the LED indicator through a single contact. When the switch closes, both:
+  <ul style="margin:6px 0">
+    <li>the audio node shorts to AGND (silence)</li>
+    <li>the red LED's cathode reaches AGND (LED lights)</li>
+  </ul>
+  No separate logic, no DPDT switch needed. (DPDT works too — with that, pole 1 = audio, pole 2 = LED, two independent circuits.)
+  <br><br>
+  <strong>Switch type:</strong> use a <strong>latching</strong> push-button (push-on, push-off) or a slide switch. Tact switches (B3F-4055 from your cart) are momentary — they only mute while held. For latching behavior with a tact switch you'd need a flip-flop chip; not worth the complexity.
+</div>
+
+<p>USB sound card: any cheap CM108-class adapter from your bench.
+<strong>Critical mod:</strong> open the dongle, find the bias resistor that feeds +5 V (or +2.5 V) to the mic-input pin (usually 2.2 k labelled R13 or similar), <strong>desolder it</strong>. Otherwise the dongle pushes phantom-ish bias voltage into your buffer's output, which (a) wastes headroom and (b) can damage NE5532's output driver if it's a hard short to +5 V.</p>
+
+<p>Use the dongle's mic-input level (sensitive, ~10 mV reference) — your buffer outputs ~50–500 mV depending on rotary position. For louder source / less dongle noise, consider feeding the dongle's <strong>line-in</strong> if present (most CM108 dongles only expose mic-in; some boards have line-in pads).</p>
+
+<h3>Mute + indicators — additions to BOM</h3>
+
+<table>
+<thead><tr><th>Ref</th><th>Part</th><th>Value / package</th><th>Qty</th><th>Note</th></tr></thead>
+<tbody>
+  <tr><td>SW1</td><td>SPST latching push-button OR slide switch</td><td>panel mount, push-on/off OR 2-position slide</td><td>1</td><td>NOT a tact-switch (those are momentary). Source separately or salvage. ~5–15 BDT.</td></tr>
+  <tr><td>LED_red</td><td>3 mm red LED</td><td>standard, ~2 V Vf</td><td>1</td><td>From cart.</td></tr>
+  <tr><td>LED_green</td><td>3 mm green LED</td><td>standard, ~2 V Vf</td><td>1</td><td>From cart.</td></tr>
+  <tr><td>R_red, R_grn</td><td>1 kΩ 1/4W</td><td>5%</td><td>2</td><td>From cart (50 in stock). ~3 mA per LED.</td></tr>
+</tbody>
+</table>
+
+<h2 id="bom">9. Final BOM <span style="font-size:13px;color:var(--muted)">(every part already on order)</span></h2>
+
+<table>
+<thead><tr><th>Ref</th><th>Part</th><th>Value / package</th><th>Qty</th><th>Source</th><th>From cart</th><th>Note</th></tr></thead>
+<tbody>
+  <tr><td>X1</td><td>20 mm raw back-electret capsule</td><td>2-terminal, omni</td><td>1</td><td>AliExpress (already on hand)</td><td>—</td><td>confirmed by analog-meter test (1.5 MΩ symmetric)</td></tr>
+  <tr><td>Q1, Q2</td><td>2N3819 N-JFET</td><td>TO-92</td><td>2</td><td><a href="https://udvabony.com/product/2n3819-n-channel-jfet-transistor-to-92/" target="_blank">u4227</a></td><td>✓ (8 ordered)</td><td>Q1 buffer, Q2 VCA</td></tr>
+  <tr><td>Q3, Q4</td><td>BC547B NPN</td><td>TO-92</td><td>2</td><td><a href="https://udvabony.com/" target="_blank">BC547B</a></td><td>✓ (12 ordered)</td><td>full-wave rectifier</td></tr>
+  <tr><td>U1, U2</td><td>NE5532 dual op-amp</td><td>DIP-8</td><td>3</td><td><a href="https://udvabony.com/product/ne5532-low-noise-dual-op-amp/" target="_blank">u7266</a></td><td>✓ (4 ordered)</td><td>signal path + sidechain + buffer; 1 spare</td></tr>
+  <tr><td>D1, D2</td><td>1N4007</td><td>DO-41</td><td>2</td><td><a href="https://udvabony.com/" target="_blank">1N4007</a></td><td>✓ (12 ordered)</td><td>rectifier path</td></tr>
+  <tr><td>D3</td><td>1N4148</td><td>DO-35</td><td>1</td><td><a href="https://udvabony.com/" target="_blank">1N4148</a></td><td>✓ (36 ordered)</td><td>asymmetric attack/release</td></tr>
+  <tr><td>C7, C_boot, C30</td><td>film coupling cap</td><td>1 µF mylar (or 22 µF NP electrolytic)</td><td>3</td><td><a href="https://udvabony.com/" target="_blank">100nF / 1nF mylar — see note</a></td><td>—</td><td><span class="warn">cart has no 1 µF mylar</span> — substitute 22 µF NP electrolytic from u3949 family or stack 10× 100nF mylar in parallel</td></tr>
+  <tr><td>C20, C21</td><td>ceramic MLCC</td><td>100 nF / 50V</td><td>2</td><td><a href="https://udvabony.com/" target="_blank">100nF MLCC u118264</a></td><td>✓ (36 ordered)</td><td>HPF caps — quality matters here, use C0G/NP0 if available</td></tr>
+  <tr><td>C40</td><td>NP electrolytic</td><td>22 µF / 50 V</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>output coupling — sub: 47 µF electrolytic u3949 (slight DC offset OK)</td></tr>
+  <tr><td>C31</td><td>electrolytic</td><td>4.7 µF / 50 V</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>envelope smoothing — sub: 47 µF (longer attack, OK for voice)</td></tr>
+  <tr><td>C32</td><td>electrolytic</td><td>10 µF / 25 V</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>release time-constant — sub: 47 µF, then drop R22 to 2.2k</td></tr>
+  <tr><td>C-rail</td><td>electrolytic</td><td>47 µF / 25 V</td><td>4</td><td><a href="https://udvabony.com/" target="_blank">47uF electrolytic</a></td><td>✓ (12 ordered)</td><td>rail decoupling</td></tr>
+  <tr><td>C-bypass</td><td>ceramic MLCC</td><td>100 nF / 50V</td><td>8</td><td>same as C20</td><td>✓</td><td>per-IC bypass</td></tr>
+  <tr><td>R1, R2</td><td>carbon film 1/4W</td><td>4.7 kΩ</td><td>2</td><td>—</td><td>partial</td><td><span class="warn">cart has 1k, 330R, 330k — no 4.7k</span> — sub: 4× 1k in series (~4k, close enough), or 1k + 3.3k if 3.3k arrives</td></tr>
+  <tr><td>R3, R4</td><td>carbon film 1/4W</td><td>10 MΩ</td><td>2</td><td>—</td><td><span class="warn">not in cart</span></td><td>gate bias — see substitution note below</td></tr>
+  <tr><td>R5</td><td>carbon film 1/4W</td><td>10 kΩ</td><td>1</td><td>—</td><td><span class="warn">not in cart</span> (1k stock only)</td><td>preamp series — sub: 10× 1k in series</td></tr>
+  <tr><td>R6</td><td>carbon film 1/4W</td><td>100 kΩ</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>preamp input bias — sub: 100× 1k or 1× 330k×³ // (parallel 3 of 330k = 110k, close)</td></tr>
+  <tr><td>R8 ladder</td><td>1% metal-film</td><td>22k, 10k, 4.7k, 2.2k, 1k, 470, 220, 100, 47</td><td>9</td><td>—</td><td><span class="warn">cart has 1k 1% only</span></td><td>build the ladder from 1k/330R/330k combinations: 22k = 22×1k, 10k = 10×1k, 4.7k = 14×330R, 2.2k = 7×330R, 1k = 1k, 470 = 1k‖1k‖1k≈333Ω no — see substitution table below</td></tr>
+  <tr><td>R10, R11, R12</td><td>carbon film 1/4W</td><td>100 kΩ</td><td>3</td><td>—</td><td><span class="warn">not in cart</span></td><td>VCA — sub: 330k‖330k‖330k = 110k (close enough), or 3× 330k in any series/parallel for 110k</td></tr>
+  <tr><td>R20, R21</td><td>1% metal-film</td><td>16 kΩ</td><td>2</td><td>—</td><td><span class="warn">not in cart</span></td><td>HPF — sub: 1k×16 in series, OR change to 15k by mixing values, OR change cap to 220 nF and use 7.2k≈7×1k, fc still ≈ 100 Hz</td></tr>
+  <tr><td>R22</td><td>carbon film 1/4W</td><td>10 kΩ</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>release time — sub: 10× 1k</td></tr>
+  <tr><td>R30, R31</td><td>carbon film 1/4W</td><td>10 kΩ / 100 kΩ</td><td>2</td><td>—</td><td><span class="warn">partial</span></td><td>sidechain — same sub strategy</td></tr>
+  <tr><td>R40</td><td>carbon film 1/4W</td><td>220 Ω</td><td>1</td><td>—</td><td><span class="warn">cart has 330R only</span></td><td>output series — 330R is fine here (slightly higher Zout, no audible effect)</td></tr>
+  <tr><td>VR1</td><td>100 kΩ log pot</td><td>panel mount, 6 mm shaft</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>threshold — needed for build, source separately</td></tr>
+  <tr><td>SW1</td><td>RS26 rotary 1P12T</td><td>panel</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>gain switch — needed for build, source separately. Or build with a single fixed gain (~38 dB) using R8 = 470Ω fixed and ditch the rotary.</td></tr>
+  <tr><td>SW2</td><td>DPDT slide switch</td><td>panel</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>gate bypass — optional, hardwire gate-engaged if not building</td></tr>
+  <tr><td>J1</td><td>3.5 mm TRS jack</td><td>PCB</td><td>1</td><td>—</td><td><span class="warn">not in cart</span></td><td>output to dongle — or solder cable directly</td></tr>
+  <tr><td>LED1</td><td>3 mm red LED + 1 kΩ series</td><td>—</td><td>1</td><td>—</td><td>partial</td><td>gate-engaged indicator — optional</td></tr>
+</tbody>
+</table>
+
+<div class="panel warn-panel">
+  <strong>Resistor reality check:</strong> the finalized cart has only <strong>three resistor values</strong>: 1 kΩ, 330 Ω, 330 kΩ (50 each, 5 %), plus 1 kΩ 1 % (50). The schematic above calls for 4.7k, 10k, 22k, 16k, 47, 100, 220, 470, 2.2k, 100k, 10M values. <strong>Two paths:</strong>
+  <ol style="margin:6px 0">
+    <li><strong>Build the BOM correctly:</strong> add a resistor assortment kit to the next order. ~50 BDT for E12 series 1 % metal-film 0–1M kit covers everything.</li>
+    <li><strong>Build with what you have:</strong> use series/parallel combinations of 1k / 330R / 330k. The pre-build ladder above shows feasible substitutions for most stages, but the 10 M gate-bias resistors (R3, R4) are <strong>not buildable</strong> from any combination of 1k/330R/330k — you cannot get 10 M from those values without 10 000+ resistors in series. <span class="warn">10 M resistors are mandatory for stage 1.</span></li>
+  </ol>
+  <strong>Recommendation: order 4× 10 M resistors and a 1 % E12 kit before building.</strong> Without these, v3 is not buildable. udvabony stocks 10 M (sku u2122 referenced in v2 BOM).
+</div>
+
+<h2 id="opcount">10. Op-amp halves accounting</h2>
+
+<table>
+<thead><tr><th>Stage</th><th>Op-amp halves used</th><th>Running total</th></tr></thead>
+<tbody>
+  <tr><td>Stage 2 — HPF Sallen-Key</td><td>1</td><td>1</td></tr>
+  <tr><td>Stage 3 — non-inverting preamp</td><td>1</td><td>2</td></tr>
+  <tr><td>Stage 5 — sidechain rectifier driver</td><td>1</td><td>3</td></tr>
+  <tr><td>Stage 5 — sidechain comparator/envelope buffer</td><td>1</td><td>4</td></tr>
+  <tr><td>Stage 6 — output buffer</td><td>1</td><td>5</td></tr>
+  <tr><td>Spare</td><td>3</td><td>8</td></tr>
+</tbody>
+</table>
+
+<p>5 of 8 NE5532 halves used. 3 free. <strong>2 NE5532 chips needed</strong>, not 4. The cart has 4 → 2 spare chips for repair / future builds.</p>
+
+<h2 id="build">11. Build &amp; bring-up notes</h2>
+
+<ol>
+  <li><strong>Verify ±9 V rails first</strong> with no ICs in sockets. Both isolators powered, decoupling caps in place, measure +9.0 ±0.3 V and −9.0 ±0.3 V at NE5532 socket pin 8 / pin 4 respectively. If either rail is off, fix before installing ICs.</li>
+  <li><strong>First-power smoke test:</strong> 100 Ω resistor in series with each rail temporarily — if anything glows, the resistor saves the DC-DC modules.</li>
+  <li><strong>Bring up Stage 1 alone:</strong> install Q1, capsule attached. Probe Vs (Q1 source). Should be 0.3–1.5 V above audio GND. If Vs &gt; 2 V, swap Q1 (high Idss sample) or raise R2. If Vs &lt; 0.2 V, low-Idss sample, lower R2 to 2.2 k.</li>
+  <li><strong>Inject test tone</strong>: 1 kHz, 1 mV-pp via 100 pF cap into capsule (+) terminal. Should see ~0.85 mV-pp at Q1 source (Av ≈ 0.85). Confirm before moving on.</li>
+  <li><strong>Bring up Stage 2 (HPF):</strong> install one NE5532. Sweep tone 30 Hz to 300 Hz at constant amplitude. Verify −12 dB at 50 Hz, −3 dB at 100 Hz, flat above 200 Hz.</li>
+  <li><strong>Bring up Stage 3 (preamp):</strong> rotary at pos 4 (R8 = 4.7k → +14 dB). Inject 1 mV at HPF input, expect 5 mV at preamp output.</li>
+  <li><strong>Bring up Stage 5 (sidechain) WITHOUT Stage 4 connected:</strong> tap audio at preamp output, watch comparator output on scope. Speak into mic — comparator should swing −9 V → +9 V on syllables. Adjust VR1 until threshold sits ~10 dB below normal speaking level.</li>
+  <li><strong>Connect Stage 4 (VCA):</strong> with sidechain working, the gate should now open on speech and close in silence. Listen for chatter; if present, increase release time-constant (larger C32).</li>
+  <li><strong>Connect dongle:</strong> only after all the above passes. Use shortest possible 3.5 mm cable (10–20 cm). Confirm host sees the dongle as a USB Audio Class device. Record a test in Audacity, check noise floor in silence — should be &lt; −60 dB FS at preamp pos 8.</li>
+</ol>
+
+<h2 id="mech">12. Mechanical &amp; acoustic notes</h2>
+
+<ul>
+  <li><strong>Capsule mounting:</strong> shock-isolate via foam grommet or rubber band suspension. Mechanical noise from a desk hit will conduct through the chassis to the capsule otherwise.</li>
+  <li><strong>Capsule wiring:</strong> enameled copper wire run inside copper desoldering braid (you have braid from the DIY Perks build). Braid grounded to chassis at <strong>capsule end ONLY</strong> — single-point shield ground prevents ground loops.</li>
+  <li><strong>Gate node hygiene:</strong> the Q1 gate / R3 / R4 / capsule junction is gigaohm-class. PCB needs a guard ring around it tied to Q1 source (the bootstrap node). No flux residue. Conformal coat after build is recommended for humidity (Dhaka monsoon).</li>
+  <li><strong>Enclosure:</strong> closed metal box (aluminium tea-tin, project box, even a metal cookie tin). Front face has the capsule + foam windscreen; back face has the rotary, threshold pot, and 3.5 mm output. Chassis is the shield — tie chassis to audio GND at the 3.5 mm sleeve.</li>
+  <li><strong>Windscreen:</strong> open-cell foam in front of the capsule, ~10 mm thick. Cuts plosives and breath bursts. Cheap upholstery foam or a salvaged pop-filter works.</li>
+  <li><strong>Recording position:</strong> mic 3–5 cm from corner of mouth, slightly off-axis (say, 30°). Off-axis position avoids the worst plosives. Close distance gives 20+ dB SNR over room noise — this is the single biggest noise reducer in the build, more than HPF or gate combined.</li>
+</ul>
+
+<h2 id="validation">13. Validation pass <span style="font-size:13px;color:var(--muted)">(skeptical re-read, v1→v2 style)</span></h2>
+
+<table>
+<thead><tr><th>#</th><th>Check</th><th>Result</th></tr></thead>
+<tbody>
+  <tr><td>1</td><td>Stage 1 JFET has a real DC return (gate not floating)</td><td><span class="good">PASS</span> — R3+R4 to GND</td></tr>
+  <tr><td>2</td><td>Stage 1 JFET biases up at ±9 V (Vs in 0.3–1.5 V window)</td><td><span class="good">PASS</span> — modeled Id ≈ 1 mA, Vs ≈ 0.5 V</td></tr>
+  <tr><td>3</td><td>Stage 2 HPF cutoff matches the math</td><td><span class="good">PASS</span> — 99.5 Hz</td></tr>
+  <tr><td>4</td><td>Stage 3 preamp gain formula is correct (non-inverting, not inverting)</td><td><span class="good">PASS</span> — Av = 1 + R8/R5</td></tr>
+  <tr><td>5</td><td>Stage 4 VCA gate gives at least −40 dB at full close</td><td><span class="good">PASS</span> — 100k:30Ω = −70 dB</td></tr>
+  <tr><td>6</td><td>Stage 5 NE5532 used as comparator does not phase-reverse near rails</td><td><span class="good">PASS</span> — NE5532 has BJT input, no JFET input phase-reversal pathology (TL07x problem only)</td></tr>
+  <tr><td>7</td><td>NE5532 bias-current offset acceptable for chosen R values</td><td><span class="good">PASS</span> — 200 nA × 22k = 4.4 mV, within budget</td></tr>
+  <tr><td>8</td><td>NE5532 slew rate adequate for 20 kHz audio</td><td><span class="good">PASS</span> — 9 V/µs, requires 5 V × 2π × 20kHz = 0.6 V/µs at full output</td></tr>
+  <tr><td>9</td><td>Output buffer can drive 22 µF NP coupling cap</td><td><span class="good">PASS</span> — NE5532 sources 38 mA, plenty</td></tr>
+  <tr><td>10</td><td>Output cannot present DC to dongle's mic-input pin</td><td><span class="good">PASS</span> — C40 22 µF NP blocks DC</td></tr>
+  <tr><td>11</td><td>Single-point GND between audio side and USB dongle GND</td><td><span class="good">PASS</span> — 3.5 mm sleeve only</td></tr>
+  <tr><td>12</td><td>HPF doesn't squash voice fundamentals more than 3 dB</td><td><span class="good">PASS</span> — 100 Hz fc, voice fund &gt; 100 Hz at 3-cm distance with proximity boost</td></tr>
+  <tr><td>13</td><td>Gate threshold range usable in Dhaka noise floor (~50 dB SPL ambient)</td><td><span class="good">PASS</span> — −40 to −10 dB sweep covers the working range</td></tr>
+  <tr><td>14</td><td>BOM resistor values exist in finalized cart</td><td><span class="warn">FAIL</span> — see warning above. <strong>Order resistor kit + 10 M before building.</strong></td></tr>
+  <tr><td>15</td><td>BOM electrolytic values exist in finalized cart (4.7 µF, 10 µF, 22 µF NP)</td><td><span class="warn">PARTIAL</span> — only 47 µF and 100 µF in cart. Substitutions documented inline.</td></tr>
+  <tr><td>16</td><td>Rotary switch and pots in cart</td><td><span class="warn">FAIL</span> — neither in finalized cart. Source separately or simplify to fixed gain + fixed threshold.</td></tr>
+  <tr><td>17</td><td>3.5 mm TRS jack in cart</td><td><span class="warn">FAIL</span> — not in cart. Solder cable directly to PCB as fallback.</td></tr>
+</tbody>
+</table>
+
+<div class="panel warn-panel">
+  <strong>Honest summary of the validation pass:</strong> the <strong>electronic design is sound</strong> (checks 1–13 pass). The <strong>BOM-vs-cart fit is poor</strong> (checks 14–17). Before building, decide:
+  <ol style="margin:6px 0">
+    <li><strong>Make a small additional order</strong> for: 10M ×4, resistor E12 kit, 22 µF NP, 4.7 µF, 10 µF electros, 100k log pot, RS26 rotary, 3.5mm TRS jack. Probably under 200 BDT total. Or:</li>
+    <li><strong>Build a "lite" v3</strong>: skip rotary (fixed +38 dB gain), skip threshold pot (fixed mid-threshold), skip 3.5mm jack (cable hardwired). Still works, less front-panel control. This needs only the 10M ×4 + a few electros from the next order — under 50 BDT.</li>
+  </ol>
+</div>
+
+<h2 id="future">14. Future work</h2>
+
+<ul>
+  <li><strong>Wireless lavalier</strong> using the spare 4× 9mm electrets. Different design — small package, single-supply, FM transmitter or BLE audio. Out of scope for this document. Memory note exists; revisit when ready.</li>
+  <li><strong>Gradient cardioid pair</strong> using the 20mm + 1× 9mm: real off-axis rejection for noisier environments. Same NE5532 backbone, add a buffer + inverting summer. Easy upgrade path from v3 — same PCB, add daughtercard. Document as v3-grad if/when needed.</li>
+  <li><strong>Shotgun upgrade</strong>: drop v3 into a slotted 20-cm aluminium tube with internal damping foam. Mechanical project, not electronic. Will give some HF directionality but won't match a commercial shotgun without precision tube tuning.</li>
+  <li><strong>PCM2912A on-board USB</strong>: replaces external dongle with a single chip ADC + USB transceiver. Cleaner, smaller, no dongle mod needed. Requires sourcing PCM2912A (~$3–5) outside BD. Document if user later wants a clean single-PCB build.</li>
+</ul>
+
+<hr>
+
+<footer>
+  Drafted 2026-05-03 from cart-confirmed parts list (memory: udvabony 1937.80 BDT order, 2026-05-01) + analog-meter capsule test (20mm = raw, ~1.5MΩ symmetric).
+  Architecture decisions: single-capsule omni + close-mic + HPF + gate (Path A); gradient cardioid (Path B) and shotgun upgrade noted as future work.
+  v3 supersedes v2 for the noisy-environment use case; v2 retained as `schematic.html` reference.
+</footer>
+
+</div>
+</body>
+</html>

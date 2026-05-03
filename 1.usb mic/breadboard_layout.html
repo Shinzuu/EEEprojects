@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>USB Mic v3 — Breadboard layout & wiring sequence</title>
+<style>
+  :root{--bg:#0f1115;--panel:#161a22;--ink:#e6e6e6;--muted:#9aa0a6;--accent:#6ee7b7;--accent2:#f59e0b;--warn:#f87171;--ok:#34d399;--link:#93c5fd;--border:#262b36;--code-bg:#0b0d12;--rail-pos:#fbbf24;--rail-neg:#60a5fa;--gnd:#9ca3af;--sig:#f472b6;}
+  @media (prefers-color-scheme: light){:root{--bg:#fafafa;--panel:#fff;--ink:#1a1a1a;--muted:#555;--accent:#047857;--accent2:#b45309;--warn:#b91c1c;--ok:#15803d;--link:#1d4ed8;--border:#e5e7eb;--code-bg:#f3f4f6;--rail-pos:#b45309;--rail-neg:#1d4ed8;--gnd:#374151;--sig:#be185d;}}
+  *{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+  header{border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:24px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.01em}
+  h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:17px;margin:20px 0 8px;color:var(--accent)}
+  h4{font-size:15px;margin:14px 0 6px;color:var(--accent2);text-transform:uppercase;letter-spacing:.04em}
+  p{margin:8px 0}a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
+  .meta{color:var(--muted);font-size:13px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin:14px 0}
+  .info-panel{border-left:3px solid var(--accent);background:rgba(110,231,183,.05)}
+  .warn-panel{border-left:3px solid var(--warn);background:rgba(248,113,113,.05)}
+  .ok-panel{border-left:3px solid var(--ok);background:rgba(52,211,153,.06)}
+  pre,code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12px;line-height:1.4}
+  code{background:var(--code-bg);padding:1px 5px;border-radius:4px;font-size:.92em}
+  pre code{background:none;padding:0}
+  .legend{font-size:12.5px;margin:8px 0}
+  .legend span{display:inline-block;padding:2px 8px;border-radius:4px;margin-right:6px;font-weight:600}
+  .pos{background:var(--rail-pos);color:#000}
+  .neg{background:var(--rail-neg);color:#fff}
+  .gnd{background:var(--gnd);color:#000}
+  .sig{background:var(--sig);color:#fff}
+  table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+  th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel);color:var(--accent);font-weight:600}
+  ul,ol{padding-left:22px}li{margin:4px 0}
+  hr{border:0;border-top:1px solid var(--border);margin:32px 0}
+  footer{color:var(--muted);font-size:12.5px;margin-top:40px;text-align:center}
+  .warn{color:var(--warn);font-weight:600}.good{color:var(--ok);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>USB Mic v3 — Breadboard layout &amp; wiring sequence</h1>
+  <p class="meta">
+    Companion document to <a href="schematic_v3.html">schematic_v3.html</a>. Translates the schematic into a physical 830-point breadboard layout with row/column coordinates, plus a stage-by-stage wiring &amp; bring-up sequence.
+  </p>
+  <p>
+    <strong>Goal:</strong> build incrementally on a single breadboard, validate each stage with a multimeter before adding the next, never have more than one un-tested component in the circuit at any moment.
+  </p>
+</header>
+
+<div class="panel info-panel">
+  <strong>How to use this doc:</strong>
+  <ol style="margin:6px 0">
+    <li>Read the <a href="#bb-anatomy">breadboard anatomy</a> section first — confirms you understand which holes are connected.</li>
+    <li>Follow the <a href="#wiring-stages">stage-by-stage wiring</a> — each stage builds only one block of circuit, then you test it before moving on.</li>
+    <li>The <a href="#power-first">power-up sequence</a> at the end of each stage tells you what voltages to expect at which row/column. <strong>If a measurement is off, stop. Don't keep wiring.</strong></li>
+  </ol>
+</div>
+
+<h2 id="bb-anatomy">1. Breadboard anatomy (830-point full-size)</h2>
+
+<p>An 830-point breadboard has:</p>
+
+<ul>
+  <li><strong>4 power rails</strong> (top + bottom, each split into two halves on a typical 830-pt board): <code>+ red</code> and <code>− blue</code>. <strong>The rails are NOT connected end-to-end on most 830-pt boards</strong> — they break in the middle. Verify with continuity meter; if broken, jumper the halves together.</li>
+  <li><strong>Two terminal strips</strong>, each with 5 holes per column connected vertically. Top strip = rows <code>a-b-c-d-e</code>. Bottom strip = rows <code>f-g-h-i-j</code>. Columns numbered 1–63 (or 1–64).</li>
+  <li><strong>Center gap</strong> between row e and row f — this is where DIP-8 ICs straddle. Top half of the IC (pins 1–4) on rows e/f side, bottom half (pins 5–8) on opposite side.</li>
+</ul>
+
+<p>Rail naming convention used in this document:</p>
+
+<div class="legend">
+  <span class="pos">+5V</span> top rail, marked red
+  <span class="neg">−5V</span> bottom rail, marked blue
+  <span class="gnd">AGND</span> audio ground — assigned to the inner blue rail (top) and inner red rail (bottom) jumpered together. (Yes, swapping rail color from convention — read carefully.)
+  <span class="sig">SIG</span> signal nodes between stages
+</div>
+
+<p>Why this rail assignment: most 830-pt boards have 4 rails (top: red+blue; bottom: red+blue). For a split supply:</p>
+
+<pre>
+TOP outer rail (red)  ───────────────── +5V
+TOP inner rail (blue) ───────────────── AGND
+                                        (use jumper to bottom inner rail)
+BOTTOM inner rail (red) ─────────────── AGND
+BOTTOM outer rail (blue) ────────────── −5V
+</pre>
+
+<p>This puts AGND on both inner rails (jumpered together at one point), so any component near the middle of the board can reach AGND with a short jumper. +5 V is at the top edge, −5 V at the bottom edge. ICs straddling the center get +V on one rail and AGND a row away.</p>
+
+<div class="panel warn-panel">
+  <strong>Common pitfall:</strong> on many cheap 830-pt boards the rails BREAK at column 32 or so (mid-board). Before doing anything, set DMM to continuity, probe rail end-to-end. If it beeps end-to-end, you're fine. If not, run a jumper from column 1 to column 60 on each rail.
+</div>
+
+<h2 id="component-placement">2. Component placement map</h2>
+
+<p>Layout philosophy: signal flows <strong>left to right</strong>. Power is on the rails. Each stage gets ~10 columns, with empty space between stages for jumpers and component swaps.</p>
+
+<pre>
+Column:  1   5   10        20        30        40        50        60
+         │   │    │         │         │         │         │         │
+TOP RAIL +5V ═════════════════════════════════════════════════════════ +5V
+TOP RAIL AGND ════════════════════════════════════════════════════════ AGND
+       ┌─────────────────────────────────────────────────────────────────┐
+   row a│   ░░PSU░░ ░CAPSL░  ░STG1░░  ░STG2░░  ░STG3░░  ░STG4░░  ░OUT░░  │
+   row b│  decouple  X1+R3   Q1 buf   HPF      preamp   VCA gate buffer  │
+   row c│            R4      C_boot   NE5532A  NE5532B  Q2       NE5532C │
+   row d│                                                                │
+   row e│  ─────── DIP-8 IC #1 (NE5532) straddles here, cols ~25–32 ───  │
+   row f│  ─────── DIP-8 IC #2 (NE5532) straddles here, cols ~50–57 ───  │
+   row g│                                                                │
+   row h│            STG5 sidechain (rectifier + comparator + envelope)  │
+   row i│            spans cols ~35–55, below preamp/VCA                 │
+   row j│                                                                │
+       └────────────────────────────────────────────────────────────────┘
+BOT RAIL AGND ════════════════════════════════════════════════════════ AGND
+BOT RAIL −5V ═════════════════════════════════════════════════════════ −5V
+
+LEGEND:
+  ░░░ = component cluster zone
+  X1   = capsule (off-board, wires in via cols 8–10)
+  Q1   = JFET buffer (TO-92, cols 13–15)
+  Q2   = JFET VCA (TO-92, cols 42–44)
+  IC#1 = NE5532 #1, halves used = HPF (Stage 2A) + preamp (Stage 3B)
+  IC#2 = NE5532 #2, halves used = sidechain rectifier + comparator
+  IC#3 = NE5532 #3 (optional 3rd chip), one half = output buffer.
+         OR move output buffer to spare half of IC#1/IC#2 if pin layout permits.
+</pre>
+
+<h3>Column-by-column reference</h3>
+
+<table>
+<thead><tr><th>Cols</th><th>Block</th><th>Components placed here</th></tr></thead>
+<tbody>
+  <tr><td>1–6</td><td>PSU decoupling</td><td>2× 100 µF rail caps (1 per rail), 4× 100 nF rail caps. 2× 330 Ω dummy load resistors (one rail to AGND, one rail to AGND).</td></tr>
+  <tr><td>7–11</td><td>Capsule input</td><td>X1 wires arrive here. R3 (10 M) and R4 (10 M) form gate-bias divider. C_boot (1 µF film) goes here.</td></tr>
+  <tr><td>13–18</td><td>Stage 1 — JFET buffer</td><td>Q1 (2N3819, TO-92), R1 (4.7k drain load), R2 (4.7k source resistor). C7 coupling cap on output.</td></tr>
+  <tr><td>20–24</td><td>Stage 2 — HPF</td><td>R20, R21 (16k each), C20, C21 (100 nF each). Sallen-Key topology.</td></tr>
+  <tr><td>25–32</td><td>NE5532 #1</td><td>DIP-8 straddles center gap. Pin 1=Out_A, Pin 2=−in_A, Pin 3=+in_A (HPF goes to pin 3), Pin 4=−5V, Pin 5=+in_B, Pin 6=−in_B, Pin 7=Out_B, Pin 8=+5V. Half A used for HPF, half B for preamp Stage 3.</td></tr>
+  <tr><td>33–38</td><td>Stage 3 — preamp gain network</td><td>R5 (10k input series), R6 (100k bias), R8 (selectable gain — fixed 470 Ω for first build). 100 pF in parallel with R8 (RFI suppression).</td></tr>
+  <tr><td>40–46</td><td>Stage 4 — VCA gate</td><td>Q2 (2N3819), R10 (100k series), R11 (100k gate drive), R12 (100k linearization).</td></tr>
+  <tr><td>48–55</td><td>NE5532 #2 (sidechain)</td><td>DIP-8 straddles. Half A = rectifier driver, half B = comparator + envelope buffer. Plus BC547 ×2 (Q3/Q4) full-wave rectifier nearby.</td></tr>
+  <tr><td>56–60</td><td>Stage 6 — output buffer</td><td>NE5532 #3 (only 1 half used) or move into spare half of IC#1. R40 (220R), C40 (22 µF NP).</td></tr>
+  <tr><td>61–63</td><td>Output</td><td>Wires off-board to 3.5 mm TRS → USB dongle.</td></tr>
+</tbody>
+</table>
+
+<h2 id="wiring-stages">3. Stage-by-stage wiring sequence</h2>
+
+<div class="panel ok-panel">
+  <strong>Discipline:</strong> at the end of each stage, do the test in the "<em>Power up &amp; verify</em>" subsection BEFORE wiring the next stage. If a test fails, stop and debug. The whole point of this document is to <strong>not</strong> wire the entire schematic and "see if it works."
+</div>
+
+<h3 id="stage-0">Stage 0 — Bare power supply</h3>
+
+<p><strong>What you wire:</strong> only the PSU and the rails. No capsule, no ICs, no transistors. Just B0505 modules + decoupling caps + dummy loads.</p>
+
+<pre>
+USB-A male connector (existing, off-board)
+   Pin 1 (VBUS, +5V) ─── breadboard top-rail-1 (USB +5)
+   Pin 4 (GND)       ─── breadboard top-rail-2 (USB GND)
+                          ↑
+                          NOTE: USB GND lives only on the small wire from
+                          USB connector to B0505 inputs. It does NOT
+                          connect to AGND anywhere on the breadboard.
+
+  B0505 module #A (located cols 2–4 of breadboard, but use the SIDE rails
+  not the audio rails — many people put the modules on a separate small
+  perfboard with flying leads to the breadboard. Either way:)
+
+    Vin+  ── USB +5 wire
+    Vin−  ── USB GND wire
+    Vout+ ── breadboard TOP outer rail (now becomes "+5V audio rail")
+    Vout− ── breadboard inner rails (this is AGND)
+
+  B0505 module #B:
+    Vin+  ── USB +5 wire
+    Vin−  ── USB GND wire
+    Vout+ ── breadboard inner rails (also AGND — yes, tied to module A's Vout−)
+    Vout− ── breadboard BOTTOM outer rail (becomes "−5V audio rail")
+
+  Inner rails of breadboard (top inner blue + bottom inner red): jumper
+  them together with one short wire near col 30. This is your
+  AGND star point.
+
+  Decoupling caps (place at col 2):
+     +5V rail to AGND: 100 µF electrolytic (long lead = +) and 100 nF ceramic in parallel
+     −5V rail to AGND: 100 µF electrolytic (long lead = + on the AGND side, since rail is negative)
+                       and 100 nF ceramic
+
+  Dummy load resistors (place at col 4):
+     +5V to AGND: 330 Ω
+     −5V to AGND: 330 Ω
+</pre>
+
+<h4>Power up &amp; verify (Stage 0):</h4>
+<ol>
+  <li>Plug USB into a host or powered hub. <span class="warn">Do NOT plug into the dongle yet.</span> The dongle is added at Stage 1 testing time only.</li>
+  <li>DMM on DC volts, 20 V range:
+    <ul>
+      <li>Top rail to inner rail: <strong>+5.0 ±0.3 V</strong> ✓</li>
+      <li>Bottom rail to inner rail: <strong>−5.0 ±0.3 V</strong> ✓ (red probe on inner rail, black on bottom rail; or swap and read negative — either is fine if you understand the sign)</li>
+      <li>Top rail to bottom rail: <strong>+10.0 ±0.5 V</strong> ✓</li>
+    </ul>
+  </li>
+  <li>If voltages are 6+ V (instead of 5 V): dummy load not connected. Recheck.</li>
+  <li>If voltage is 0 V or close: USB cable wrong, B0505 polarity wrong, or short to GND somewhere.</li>
+  <li>If you hear <strong>any audible whine</strong> from the modules: minimum-load not met. Add a 220 Ω dummy in parallel.</li>
+  <li>Touch the modules after 1 minute on. Should be <strong>warm, not hot</strong>. Hot = short or wrong wiring.</li>
+</ol>
+
+<p class="good">Stage 0 PASS criterion: rails clean ±5 V, dummies warm-not-hot, no audible whine, USB host doesn't complain about overcurrent.</p>
+
+<h3 id="stage-1">Stage 1 — JFET buffer + capsule</h3>
+
+<p><strong>Add to the breadboard from Stage 0:</strong> capsule wires, R1, R2, R3, R4, Q1, C_boot, C7. No ICs yet.</p>
+
+<pre>
+Capsule wires arrive at cols 8–10:
+   Cap (+) signal ──► col 8, row a  (this is the JFET gate)
+   Cap (−) GND    ──► AGND inner rail (col 8 spot, short wire)
+
+Resistor network (gate bias):
+   R3 = 10 M:
+     One leg ──► col 8, row b (joins capsule + and Q1 gate)
+     Other leg ──► col 9, row b (junction with R4 + C_boot)
+   R4 = 10 M:
+     One leg ──► col 9, row c (junction with R3)
+     Other leg ──► AGND (short jumper to inner rail)
+   C_boot = 1 µF:
+     One leg ──► col 9, row d (junction with R3+R4)
+     Other leg ──► col 15, row a (Q1 source — see below)
+
+Q1 (2N3819) — TO-92 package, flat side facing you:
+     LEFT  pin = Drain
+     CENTER pin = Source
+     RIGHT pin = Gate
+   Insert at cols 13–15:
+     Drain (left)  ──► col 13, row a
+     Source (center) ──► col 14, row a
+     Gate (right) ──► col 15, row a (also = capsule signal node, jumper from col 8)
+
+Wait — this puts gate on the WRONG side. Re-check 2N3819 pinout.
+
+CORRECTION: 2N3819 standard pinout (TO-92, flat facing you, leads down):
+     Pin 1 (LEFT)   = Drain
+     Pin 2 (CENTER) = Source
+     Pin 3 (RIGHT)  = Gate
+   This is the TI/Fairchild standard. Some Asian clones (UTC, CDIL) have S-G-D
+   instead. ALWAYS verify with DMM diode mode before powering.
+
+Verify pinout: DMM in diode mode, black probe on suspected Gate, red on
+suspected Drain or Source. Reading should be ~0.6 V drop. Reverse: open.
+
+R1 = 4.7k (drain load):
+   One leg ──► +5V rail
+   Other leg ──► col 13, row b (Q1 drain)
+
+R2 = 4.7k (source resistor):
+   One leg ──► col 14, row b (Q1 source)
+   Other leg ──► AGND inner rail
+   (NOT to −5V — for v3 single-rail buffer test, keep R2 to AGND. Move
+   to −5V only when full circuit comes online.)
+
+C7 = 1 µF (output coupling to next stage):
+   One leg ──► col 14, row c (Q1 source)
+   Other leg ──► col 18, row a (output node, will go to Stage 2 input later)
+
+For testing Stage 1 standalone, jumper:
+   col 18, row a ──► flying wire ──► dongle mic input tip
+   AGND inner rail ──► flying wire ──► dongle mic input sleeve
+</pre>
+
+<h4>Power up &amp; verify (Stage 1):</h4>
+<ol>
+  <li>Visual inspection: trace each wire against the diagram. Take a phone photo before powering.</li>
+  <li>Plug USB into host. DMM:
+    <ul>
+      <li>Q1 drain (col 13, row b): <strong>+3 to +5 V</strong> ✓ (expected ~+4.5 V at biased operating point with +5 V rail and 4.7k drain load)</li>
+      <li>Q1 source (col 14, row b): <strong>+0.3 to +1.5 V</strong> ✓ (expected ~+0.5 V with R2 = 4.7k to AGND)</li>
+      <li>Q1 gate (col 15, row a): <strong>0 V ±100 mV</strong> ✓ (capsule output is essentially DC zero, R3+R4 hold gate at GND)</li>
+    </ul>
+  </li>
+  <li>If Vd ≈ +5 V (no drop): Q1 not conducting. Check pinout. Try another 2N3819 — sample variance is real.</li>
+  <li>If Vs &gt; 2 V: high-Idss sample. Either (a) accept it, signal will still work, or (b) raise R2 to 10k.</li>
+  <li>If Vs = 0 V: R2 open, or Q1 dead, or G-S shorted.</li>
+  <li>Now connect to dongle and open Audacity. Set input to dongle. Tap the capsule lightly with a finger:
+    <ul>
+      <li>Should see a clear amplitude spike in the input meter. ✓</li>
+      <li>Speak into capsule from 10 cm. Should hear voice clearly, low-level (no preamp yet — expect quiet).</li>
+      <li>Hold breath: noise floor in Audacity should be lower than what dongle alone produces with its mic-input shorted.</li>
+    </ul>
+  </li>
+</ol>
+
+<p class="good">Stage 1 PASS criterion: Q1 biased correctly (Vs in window), tap test produces audio, voice is recognizable through dongle.</p>
+
+<div class="panel warn-panel">
+  <strong>If Stage 1 doesn't pass, do NOT proceed.</strong> The remaining stages all build on top of a working JFET buffer. If this doesn't work, no amount of preamp/HPF/gate fixes it. Common Stage 1 fixes:
+  <ul>
+    <li>Capsule polarity reversed → swap capsule wires.</li>
+    <li>Q1 pinout wrong → use DMM diode mode to identify Drain/Source/Gate.</li>
+    <li>Gate node has flux residue (gigaohm impedance) → clean with isopropyl, dry thoroughly.</li>
+    <li>Long wires from capsule to breadboard → shorten. Capsule should be 5–10 cm from breadboard, no more, with shielded wire (desolder braid as shield).</li>
+    <li>R3 or R4 not actually 10 MΩ → measure with DMM (high range) before installing. Resistor color codes for 10 M: brown-black-blue-gold (4-band) or brown-black-black-green-brown (5-band).</li>
+  </ul>
+</div>
+
+<h3 id="stages-2-onwards">Stages 2 onwards</h3>
+
+<p>Stages 2 (HPF), 3 (preamp), 4 (VCA), 5 (sidechain), 6 (output buffer) follow the same pattern: add components for one stage, power up, verify with DMM at known nodes, listen via dongle, only then proceed.</p>
+
+<p>This document will be extended with detailed wiring for stages 2–6 once Stage 1 is confirmed working on actual hardware. The reason: stage-1 reality (which capsule sample, which JFET sample, which exact Vs you measure) often informs small adjustments in later stages. Don't write the bring-up procedure before the capsule has been measured in-circuit.</p>
+
+<h2 id="power-first">4. The "power first, signal later" principle</h2>
+
+<p>Every stage you add: power-up first with components in place but the previous stage's signal path NOT YET connected to the new stage's input. Verify rail voltages and DC operating points are unchanged. Then connect the signal in.</p>
+
+<p>Why: a wiring error in the new stage might have shorted a rail or pulled a node to a wrong DC voltage. Disconnecting the signal isolates "did the new stage break the rails?" from "does the new stage process signal correctly?" Two failure modes, debugged separately, much faster.</p>
+
+<h2 id="bb-pitfalls">5. Breadboard-specific pitfalls for this circuit</h2>
+
+<table>
+<thead><tr><th>Pitfall</th><th>Symptom</th><th>Fix</th></tr></thead>
+<tbody>
+  <tr><td>NE5532 oscillation from long power leads</td><td>Loud high-pitched whine, noise floor +30 dB even in silence</td><td>Place 100 nF ceramic from pin 8 (V+) to pin 4 (V−) of NE5532 directly across the IC, not "near" — the cap leads must be &lt; 10 mm long.</td></tr>
+  <tr><td>Capsule shield touches breadboard rail</td><td>Hum 50 Hz fundamental, not directly proportional to talking</td><td>Capsule shield (desolder braid) terminates at AGND star point ONLY. Don't tin the shield ends — they fray and short to neighbors.</td></tr>
+  <tr><td>2N3819 inserted backward</td><td>No bias, Vd = +V, Vs = 0 V (or vice versa)</td><td>Pull, verify pinout with DMM diode mode, reinsert. Hot insertion can damage gate — power off first.</td></tr>
+  <tr><td>10 M resistor lead bent too sharply at body</td><td>Cracked carbon film, resistor reads 50 M+ or open</td><td>Bend leads at least 3 mm from the body. If using 5%-tolerance carbon film 1/4 W, value can drift up to 8% under thermal/mechanical stress — measure with DMM before installing.</td></tr>
+  <tr><td>Breadboard rail breaks at column 32 (mid-rail break)</td><td>Power on one side of the board, dead on the other</td><td>Continuity-check rails before any wiring. Jumper if needed.</td></tr>
+  <tr><td>JFET gate node has flux residue</td><td>Random crackles, "popcorn" noise even in silence</td><td>Clean with isopropyl, blow-dry with compressed air. Gate node is gigaohm-class — surface contamination matters.</td></tr>
+  <tr><td>USB cable picking up RF</td><td>"Buzz" that changes when you move the cable</td><td>Short USB cable (&lt; 30 cm). Add ferrite bead near host plug.</td></tr>
+  <tr><td>NE5532 with phantom DC offset on output</td><td>Output rails at one extreme, audio clipped one side</td><td>One of the input pins is floating or has wrong reference. Verify both + and − inputs have a defined DC path to AGND through finite impedance (&lt; 10 M).</td></tr>
+</tbody>
+</table>
+
+<h2 id="next">6. What's NOT in this document yet</h2>
+
+<ul>
+  <li>Detailed Stage 2–6 breadboard wiring (deliberately deferred until Stage 1 hardware exists and Vs is measured).</li>
+  <li>Power-rail decoupling cap routing exact placement (cap orientation, lead length specifics).</li>
+  <li>NE5532 #2 + #3 placement details.</li>
+  <li>Probe-point schedule for sidechain bring-up (will need scope or audio injection).</li>
+  <li>Transition guidance from breadboard to perfboard (Milestone 7.5 in the build plan).</li>
+</ul>
+
+<p>These will be added once the cart arrives, the breadboard is in front of you, and Stage 1 is built. Writing them now is premature — too many decisions depend on what the actual JFET sample does in your circuit.</p>
+
+<hr>
+
+<footer>
+  Drafted 2026-05-03 alongside <a href="schematic_v3.html">schematic_v3.html</a>. PSU = 2× B0505S-1W → ±5 V, confirmed feasible per user inventory. Capsule = 20 mm raw back-electret, omni, no internal FET. Breadboard target = 830-point full-size from finalized cart.
+</footer>
+
+</div>
+</body>
+</html>
